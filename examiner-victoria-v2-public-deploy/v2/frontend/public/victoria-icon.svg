@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Examiner Victoria icon">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="64" x2="416" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB020"/>
+      <stop offset="1" stop-color="#FF4B4B"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="138" y1="128" x2="374" y2="288" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2D2D3A"/>
+      <stop offset="1" stop-color="#5B4B8A"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+  <path d="M92 202 256 122l164 80-164 80L92 202Z" fill="url(#cap)"/>
+  <path d="M158 235v72c0 34 44 62 98 62s98-28 98-62v-72l-98 48-98-48Z" fill="#312E46"/>
+  <path d="M408 211v104" stroke="#2D2D3A" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="408" cy="344" r="22" fill="#FFD166"/>
+  <path d="M386 386h44l-16-44h-12l-16 44Z" fill="#FFD166"/>
+  <path d="M197 194c34-20 84-20 118 0" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" opacity=".92"/>
+</svg>

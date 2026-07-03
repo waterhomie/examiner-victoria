@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: examiner-victoria-v2
+    env: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: false
+    healthCheckPath: /api/health
+    envVars:
+      - key: API_KEY
+        sync: false
+      - key: BASE_URL
+        value: https://api.gptsapi.net/v1
+      - key: MODEL
+        value: gpt-5.4-mini
+      - key: TRANSCRIPTION_MODEL
+        value: whisper-1
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MAX_AUDIO_UPLOAD_MB
+        value: "12"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: MAX_ANSWER_CHARS
+        value: "4000"
+      - key: MAX_SESSION_MESSAGES
+        value: "120"
+      - key: MAX_TTS_CHARS
+        value: "1200"
+      - key: TTS_CACHE_MAX_ITEMS
+        value: "64"

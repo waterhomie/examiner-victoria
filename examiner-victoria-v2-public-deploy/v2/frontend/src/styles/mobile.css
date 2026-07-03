@@ -1,0 +1,446 @@
+﻿/*
+  Mobile responsive layer.
+
+  Keep phone-specific layout decisions here. styles.css owns shared/desktop
+  visuals; this file owns all narrow-screen layout, spacing, and iOS-style
+  composer adjustments so desktop and phone behavior stop fighting each other.
+*/
+
+/* Legacy mobile rules migrated from styles.css. Keep broad phone layout here. */
+@media (max-width: 620px) {
+  .app-shell {
+    padding: max(8px, env(safe-area-inset-top)) 10px 0;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .topbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    margin: 0 0 8px;
+    padding: 8px 10px 9px;
+    border: 1px solid rgba(120, 120, 128, 0.13);
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.66);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.045);
+  }
+
+  .brand-block {
+    width: 100%;
+  }
+
+  .top-actions {
+    position: relative;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(92px, 1fr) minmax(72px, 0.82fr) 66px;
+    gap: 9px;
+    justify-content: stretch;
+  }
+
+  .desktop-action-buttons,
+  .top-actions > .ghost-button.sound-toggle {
+    display: none;
+  }
+
+  .mobile-more-menu {
+    display: block;
+    position: relative;
+  }
+
+  .mobile-more-menu summary {
+    width: 100%;
+    justify-content: center;
+    min-height: 33px;
+    padding: 0 11px;
+    font-size: 12.5px;
+  }
+
+  .mobile-more-panel {
+    min-width: 150px;
+  }
+
+  .ghost-button {
+    min-height: 33px;
+    padding: 0 10px;
+    font-size: 12.5px;
+  }
+
+  .practice-select {
+    min-height: 33px;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0 9px;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .practice-select span,
+  .practice-select select {
+    font-size: 12.5px;
+  }
+
+  .practice-select select {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+    text-align-last: center;
+  }
+
+  .practice-select span {
+    display: none;
+  }
+
+  .topic-select {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+    padding: 9px 10px;
+  }
+
+  .topic-select select {
+    width: 100%;
+    font-size: 13px;
+  }
+
+  .stage-card {
+    display: none;
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-radius: 18px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  .stage-card.has-stage-controls {
+    display: block;
+  }
+
+  .stage-main {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stage-card p {
+    display: none;
+  }
+
+  .stage-pill,
+  .training-pill {
+    height: 25px;
+    padding: 0 9px;
+    font-size: 0.82rem;
+  }
+
+  .stage-line {
+    gap: 6px;
+  }
+
+  .session-mini {
+    justify-content: flex-end;
+    gap: 4px;
+    max-width: 52%;
+  }
+
+  .session-mini span {
+    min-height: 24px;
+    padding: 0 7px;
+    font-size: 0.68rem;
+  }
+
+  .progress-track {
+    height: 5px;
+    margin-top: 8px;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.075em;
+  }
+
+  h1 {
+    width: auto;
+    margin-top: 3px;
+    font-size: clamp(1.7rem, 7.6vw, 2.08rem);
+    letter-spacing: -0.06em;
+  }
+
+  .mobile-stage-summary {
+    display: block;
+    margin-top: 6px;
+  }
+
+  .brand-block > .mobile-stage-summary {
+    display: none;
+  }
+
+  .mobile-stage-summary-wide {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+
+  .mobile-stage-summary .session-mini {
+    max-width: none;
+  }
+
+  .mobile-stage-summary .progress-track {
+    height: 4px;
+    margin-top: 6px;
+  }
+
+  .chat-panel {
+    gap: 9px;
+    padding-bottom: 88px;
+  }
+
+  .message-row,
+  .message-row.user {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .message-row.user {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .bubble {
+    max-width: calc(100vw - 78px);
+    padding: 11px 13px;
+    border-radius: 19px;
+  }
+
+  .status-card,
+  .error-card,
+  .notice-card,
+  .audio-card,
+  .report-card {
+    padding: 12px 13px;
+    border-radius: 18px;
+  }
+
+  .chat-panel > .status-card,
+  .chat-panel > .error-card,
+  .chat-panel > .audio-card {
+    display: none;
+  }
+
+  .mobile-toast-stack {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(84px + max(12px, env(safe-area-inset-bottom)));
+    z-index: 45;
+    display: grid;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .mobile-toast {
+    pointer-events: auto;
+    font-size: 0.9rem;
+  }
+
+  .error-card,
+  .audio-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .report-section {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .report-nav button {
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+
+  .report-section-header {
+    gap: 6px;
+  }
+
+  .report-section-header h3 {
+    font-size: 0.96rem;
+  }
+
+  .report-section-chip {
+    min-height: 22px;
+    padding: 2px 7px;
+    font-size: 0.72rem;
+  }
+
+  .report-card .rich-message ul,
+  .report-card .rich-message ol {
+    padding-left: 26px;
+  }
+
+  .composer {
+    min-height: 64px;
+    padding: 7px;
+    border-radius: 32px;
+  }
+
+  .mode-button {
+    min-width: 50px;
+    padding: 0 9px;
+  }
+
+  .record-button {
+    font-size: 16px;
+    padding: 0 10px;
+  }
+
+  .timer {
+    display: none;
+    min-width: 42px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .record-button.recording + .timer {
+    display: inline-flex;
+    justify-content: center;
+  }
+
+  .review-toggle {
+    min-width: 58px;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.58);
+    box-shadow: inset 0 0 0 1px rgba(120, 120, 128, 0.12);
+  }
+
+  .review-toggle input {
+    width: 15px;
+    height: 15px;
+  }
+
+  .review-toggle span {
+    display: inline;
+    font-size: 12px;
+  }
+
+  .score-button {
+    min-width: 42px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
+
+/* Mobile override rules added after the legacy block so they win by order. */
+@media (max-width: 620px) {
+  .app-shell {
+    min-height: 100svh;
+  }
+
+  .topbar {
+    position: sticky;
+    top: max(6px, env(safe-area-inset-top));
+    z-index: 20;
+    backdrop-filter: blur(18px);
+  }
+
+  .top-actions {
+    grid-template-columns: minmax(82px, 1fr) minmax(64px, 0.85fr) minmax(58px, 0.7fr);
+    gap: 7px;
+  }
+
+  .practice-select,
+  .mobile-more-menu summary {
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .practice-select select {
+    line-height: 1;
+  }
+
+  .mobile-stage-summary-wide .session-mini {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mobile-stage-summary-wide .session-mini span {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .chat-panel {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .assistant-row,
+  .user-row {
+    scroll-margin-bottom: 112px;
+  }
+
+  .assistant-bubble,
+  .user-bubble {
+    overflow-wrap: anywhere;
+  }
+
+  .composer-wrap {
+    width: min(100% - 16px, 760px);
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .composer {
+    box-shadow:
+      0 10px 30px rgba(0, 0, 0, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  }
+
+  .mode-button {
+    flex: 0 0 58px;
+  }
+
+  .record-button {
+    min-width: 0;
+  }
+
+  .timer {
+    min-width: 42px;
+    text-align: center;
+  }
+
+  .review-toggle {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 390px) {
+  .top-actions {
+    grid-template-columns: minmax(76px, 1fr) minmax(58px, 0.8fr) 54px;
+    gap: 6px;
+  }
+
+  h1 {
+    font-size: clamp(1.55rem, 7.2vw, 1.9rem);
+  }
+
+  .mobile-stage-summary-wide .session-mini span {
+    padding-inline: 5px;
+    font-size: 0.64rem;
+  }
+
+  .mode-button {
+    flex-basis: 52px;
+    font-size: 0.8rem;
+  }
+
+  .review-toggle span {
+    display: none;
+  }
+}
+
