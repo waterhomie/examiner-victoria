@@ -10,6 +10,7 @@ import {
   useFrontendErrorTelemetry,
   usePagehideCleanup,
   usePrepCountdown,
+  useScrollStateTelemetry,
 } from "./hooks/useBrowserEffects.js";
 import { useAnswerRecording } from "./hooks/useAnswerRecording.js";
 import { useExamController } from "./hooks/useExamController.js";
@@ -82,6 +83,7 @@ export default function App() {
   submitAnswerRef.current = controller.submitAnswer;
 
   const messages = selectMessages(state);
+  const lastMessage = messages[messages.length - 1] || null;
   const currentPhase = phaseLabel(state.session?.phase);
   const sessionView = selectSessionView(state);
   const recordButtonDisabled = recording ? false : !capabilities.canStartRecording;
@@ -153,7 +155,21 @@ export default function App() {
     state.trainingMode,
   ]);
 
-  useAutoScrollToLatest(chatPanelRef, bottomRef, [messages.length, state.busy, state.report]);
+  useAutoScrollToLatest(chatPanelRef, bottomRef, [
+    messages.length,
+    state.busy,
+    state.report,
+    sessionView.shouldShowStageCard,
+    lastMessage?.phase,
+    pendingSpeechUrl,
+  ]);
+  useScrollStateTelemetry(chatPanelRef, {
+    answerCount: sessionView.sessionStats.answered,
+    messageCount: messages.length,
+    phase: state.session?.phase,
+    practiceType: state.practiceType,
+    stageVisible: sessionView.shouldShowStageCard,
+  });
   usePrepCountdown(state.prepEndsAt, controller.setPrepEndsAt, controller.setClockTick);
   usePagehideCleanup(stopCurrentAudio);
   useFrontendErrorTelemetry();

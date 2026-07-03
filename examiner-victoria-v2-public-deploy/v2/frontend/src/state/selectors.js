@@ -37,10 +37,10 @@ export function selectSessionView(state) {
     showPart1TopicSelect,
     showCueCardSelect,
   });
-  const hasUserAnswers = sessionStats.answered > 0;
+  const hasStartedAnswering = Boolean(state.session?.candidate_answers?.length);
   const stageSelectionIsSettled =
-    (showPart1TopicSelect && (Boolean(state.selectedPart1Topic) || hasUserAnswers)) ||
-    (showCueCardSelect && (Boolean(state.selectedCueCardTitle) || hasUserAnswers));
+    (showPart1TopicSelect && (Boolean(state.selectedPart1Topic) || hasStartedAnswering)) ||
+    (showCueCardSelect && (Boolean(state.selectedCueCardTitle) || hasStartedAnswering));
 
   return {
     configWarning: selectConfigWarning(state),

@@ -119,6 +119,15 @@ foreach ($styleFile in $nonMobileStyleFiles) {
 if ($mobileStyles -notmatch "@media\s*\(max-width:\s*620px\)") {
     throw "styles/mobile.css should contain the phone breakpoint rules."
 }
+if ($mobileStyles -match "\.(assistant-row|user-row|assistant-bubble|user-bubble)\b") {
+    throw "styles/mobile.css references old message selectors. Use .message-row.assistant/.message-row.user and their .bubble children."
+}
+if ($mobileStyles -notmatch "\.message-row\.assistant" -or $mobileStyles -notmatch "\.message-row\.user") {
+    throw "styles/mobile.css must target the real mobile message row selectors."
+}
+if ($mobileStyles -notmatch "-webkit-overflow-scrolling:\s*touch" -or $mobileStyles -notmatch "touch-action:\s*pan-y") {
+    throw "styles/mobile.css must keep iOS chat-panel touch scrolling enabled."
+}
 
 $frontendSourceFiles = Get-ChildItem -LiteralPath ".\v2\frontend\src" -Recurse -File |
     Where-Object { $_.Extension -in @(".js", ".jsx") -and $_.Name -ne "api.js" }

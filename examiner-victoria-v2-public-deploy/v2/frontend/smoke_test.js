@@ -81,6 +81,20 @@ function assertStageCardSelector() {
     ...state,
     session: createSession({
       phase: "part1",
+      messages: [
+        { role: "assistant", phase: "identity", content: "Could you tell me your full name?" },
+        { role: "user", phase: "identity", content: "My name is Water." },
+        { role: "assistant", phase: "part1", content: "Do you work, or are you a student?" },
+      ],
+      candidate_answers: [{ phase: "identity", answer: "My name is Water." }],
+    }),
+  };
+  assert.equal(selectSessionView(state).shouldShowStageCard, false);
+
+  state = {
+    ...state,
+    session: createSession({
+      phase: "part1",
       candidate_answers: [{ phase: "part1", answer: "I study architecture." }],
     }),
   };

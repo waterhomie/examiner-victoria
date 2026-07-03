@@ -191,7 +191,10 @@
 
   .chat-panel {
     gap: 9px;
+    min-height: 0;
     padding-bottom: 88px;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   .message-row,
@@ -377,16 +380,19 @@
   }
 
   .chat-panel {
+    min-height: 0;
     padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .assistant-row,
-  .user-row {
+  .message-row.assistant,
+  .message-row.user {
     scroll-margin-bottom: 112px;
   }
 
-  .assistant-bubble,
-  .user-bubble {
+  .message-row.assistant .bubble,
+  .message-row.user .bubble {
     overflow-wrap: anywhere;
   }
 
