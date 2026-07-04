@@ -192,13 +192,10 @@
   .chat-panel {
     gap: 9px;
     min-height: 0;
+    padding-top: clamp(16px, 3vh, 32px);
     padding-bottom: 0;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
-  }
-
-  .chat-panel > .message-row:first-child {
-    margin-top: auto;
   }
 
   .message-row,
@@ -385,9 +382,11 @@
 
   .chat-panel {
     min-height: 0;
+    padding-top: clamp(16px, 3vh, 32px);
     padding-bottom: 0;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
+    scroll-padding-bottom: calc(124px + env(safe-area-inset-bottom));
   }
 
   .chat-bottom-anchor {

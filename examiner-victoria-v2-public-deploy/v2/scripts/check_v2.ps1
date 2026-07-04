@@ -128,8 +128,11 @@ if ($mobileStyles -notmatch "\.message-row\.assistant" -or $mobileStyles -notmat
 if ($mobileStyles -notmatch "-webkit-overflow-scrolling:\s*touch" -or $mobileStyles -notmatch "touch-action:\s*pan-y") {
     throw "styles/mobile.css must keep iOS chat-panel touch scrolling enabled."
 }
-if ($mobileStyles -notmatch "\.chat-panel\s*>\s*\.message-row:first-child\s*\{[\s\S]*?margin-top:\s*auto") {
-    throw "styles/mobile.css must bottom-align short mobile chats with .chat-panel > .message-row:first-child { margin-top: auto; }."
+if ($mobileStyles -match "\.chat-panel\s*>\s*\.message-row:first-child\s*\{[\s\S]*?margin-top:\s*auto") {
+    throw "styles/mobile.css must not force short mobile chats to the bottom with first-child margin-top:auto."
+}
+if ($mobileStyles -notmatch "padding-top:\s*clamp\(16px,\s*3vh,\s*32px\)") {
+    throw "styles/mobile.css must give the mobile chat-panel a small top breathing space."
 }
 if ($mobileStyles -notmatch "\.chat-bottom-anchor\s*\{[\s\S]*?flex-basis:\s*calc\(124px \+ env\(safe-area-inset-bottom\)\)") {
     throw "styles/mobile.css must define a mobile .chat-bottom-anchor sized above the fixed composer."
@@ -138,6 +141,11 @@ if ($mobileStyles -notmatch "\.chat-bottom-anchor\s*\{[\s\S]*?flex-basis:\s*calc
 $chatPanelSource = Get-Content -LiteralPath ".\v2\frontend\src\components\layout\ChatPanel.jsx" -Raw
 if ($chatPanelSource -notmatch 'className="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'data-testid="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'ref=\{bottomRef\}') {
     throw "ChatPanel must render a real chat-bottom-anchor bound to bottomRef."
+}
+
+$browserEffectsSource = Get-Content -LiteralPath ".\v2\frontend\src\hooks\useBrowserEffects.js" -Raw
+if ($browserEffectsSource -notmatch "answerCount\s*===\s*0" -or $browserEffectsSource -notmatch "contentBottomBeforeAnchor" -or $browserEffectsSource -notmatch "visibleSafeHeight" -or $browserEffectsSource -notmatch "shouldFollowBottom") {
+    throw "useAutoScrollToLatest must keep initial messages in natural flow and follow bottom only after real content reaches the composer safe area."
 }
 
 $frontendSourceFiles = Get-ChildItem -LiteralPath ".\v2\frontend\src" -Recurse -File |

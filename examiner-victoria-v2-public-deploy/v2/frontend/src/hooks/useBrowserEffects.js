@@ -23,16 +23,76 @@ function scrollPanelToLatest(panelRef, bottomRef, behavior) {
 }
 
 
-export function useAutoScrollToLatest(panelRef, bottomRef, triggers) {
+function readScrollMetrics(panelRef, bottomRef) {
+  const panel = panelRef.current;
+  if (!panel) return null;
+  const bottomAnchor = bottomRef.current;
+  const bottomAnchorHeight = bottomAnchor?.getBoundingClientRect?.().height || 0;
+  const contentBottomBeforeAnchor = bottomAnchor ? bottomAnchor.offsetTop : panel.scrollHeight;
+  const visibleSafeHeight = Math.max(0, panel.clientHeight - bottomAnchorHeight);
+  const distanceFromBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
+  const shouldFollowBottom = contentBottomBeforeAnchor - panel.scrollTop > visibleSafeHeight - 8;
+  const isNearBottom = distanceFromBottom <= Math.max(96, bottomAnchorHeight + 24);
+  return {
+    bottomAnchorHeight,
+    clientHeight: panel.clientHeight,
+    contentBottomBeforeAnchor,
+    distanceFromBottom,
+    isNearBottom,
+    scrollHeight: panel.scrollHeight,
+    scrollTop: panel.scrollTop,
+    shouldFollowBottom,
+    visibleSafeHeight,
+  };
+}
+
+
+function shouldScrollToLatest(panelRef, bottomRef, options, previousStateRef) {
+  const mobile = isMobileViewport();
+  if (!mobile) return true;
+
+  const answerCount = options.answerCount || 0;
+  if (answerCount === 0) return false;
+
+  const metrics = readScrollMetrics(panelRef, bottomRef);
+  if (!metrics?.shouldFollowBottom) return false;
+
+  const previous = previousStateRef.current;
+  const messageAdded = !previous || options.messageCount > previous.messageCount;
+  const answerAdded = !previous || answerCount > previous.answerCount;
+  const lastMessageChanged = !previous || options.lastMessageKey !== previous.lastMessageKey;
+  const ordinaryStateChange = !messageAdded && !answerAdded && !lastMessageChanged;
+
+  if (ordinaryStateChange) return metrics.isNearBottom;
+  return true;
+}
+
+
+export function useAutoScrollToLatest(panelRef, bottomRef, options) {
+  const previousStateRef = useRef(null);
+
   useLayoutEffect(() => {
     const mobile = isMobileViewport();
     const behavior = mobile ? "auto" : "smooth";
     const timers = [];
     let frame = null;
+    const previousState = previousStateRef.current;
+    const nextState = {
+      answerCount: options.answerCount || 0,
+      lastMessageKey: options.lastMessageKey || "",
+      messageCount: options.messageCount || 0,
+    };
+    previousStateRef.current = nextState;
 
-    scrollPanelToLatest(panelRef, bottomRef, behavior);
+    const runIfNeeded = (nextBehavior) => {
+      if (shouldScrollToLatest(panelRef, bottomRef, options, { current: previousState })) {
+        scrollPanelToLatest(panelRef, bottomRef, nextBehavior);
+      }
+    };
+
+    runIfNeeded(behavior);
     if (mobile) {
-      const runAgain = () => scrollPanelToLatest(panelRef, bottomRef, "auto");
+      const runAgain = () => runIfNeeded("auto");
       if (typeof window.requestAnimationFrame === "function") {
         frame = window.requestAnimationFrame(runAgain);
       } else {
@@ -51,7 +111,7 @@ export function useAutoScrollToLatest(panelRef, bottomRef, triggers) {
     };
     // The caller owns the trigger list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, triggers);
+  }, options.triggers);
 }
 
 
@@ -71,21 +131,24 @@ export function useScrollStateTelemetry(panelRef, bottomRef, sessionView) {
     const timer = window.setTimeout(() => {
       const panel = panelRef.current;
       if (!panel) return;
-      const bottomAnchor = bottomRef.current;
-      const distanceFromBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
+      const metrics = readScrollMetrics(panelRef, bottomRef);
+      if (!metrics) return;
       sendTelemetryEvent("ui-scroll-state", {
         answerCount,
-        bottomAnchorHeight: Math.round(bottomAnchor?.getBoundingClientRect?.().height || 0),
-        clientHeight: Math.round(panel.clientHeight || 0),
-        distanceFromBottom: Math.round(distanceFromBottom || 0),
+        bottomAnchorHeight: Math.round(metrics.bottomAnchorHeight || 0),
+        clientHeight: Math.round(metrics.clientHeight || 0),
+        contentBottomBeforeAnchor: Math.round(metrics.contentBottomBeforeAnchor || 0),
+        distanceFromBottom: Math.round(metrics.distanceFromBottom || 0),
         lastMessagePhase: sessionView.lastMessagePhase || "",
         lastMessageRole: sessionView.lastMessageRole || "",
         messageCount: sessionView.messageCount || 0,
         phase: sessionView.phase || "",
         practiceType: sessionView.practiceType || "",
-        scrollHeight: Math.round(panel.scrollHeight || 0),
-        scrollTop: Math.round(panel.scrollTop || 0),
+        scrollHeight: Math.round(metrics.scrollHeight || 0),
+        scrollTop: Math.round(metrics.scrollTop || 0),
+        shouldFollowBottom: Boolean(metrics.shouldFollowBottom),
         stageVisible: Boolean(sessionView.stageVisible),
+        visibleSafeHeight: Math.round(metrics.visibleSafeHeight || 0),
       });
     }, 420);
 

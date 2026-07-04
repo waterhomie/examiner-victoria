@@ -84,6 +84,10 @@ export default function App() {
 
   const messages = selectMessages(state);
   const lastMessage = messages[messages.length - 1] || null;
+  const answerCount = state.session?.candidate_answers?.length || 0;
+  const lastMessageKey = lastMessage
+    ? `${messages.length}:${lastMessage.role}:${lastMessage.phase || ""}:${lastMessage.content || ""}`
+    : "";
   const currentPhase = phaseLabel(state.session?.phase);
   const sessionView = selectSessionView(state);
   const recordButtonDisabled = recording ? false : !capabilities.canStartRecording;
@@ -155,18 +159,22 @@ export default function App() {
     state.trainingMode,
   ]);
 
-  useAutoScrollToLatest(chatPanelRef, bottomRef, [
-    messages.length,
-    state.busy,
-    state.report,
-    sessionView.shouldShowStageCard,
-    lastMessage?.role,
-    lastMessage?.phase,
-    lastMessage?.content,
-    pendingSpeechUrl,
-  ]);
+  useAutoScrollToLatest(chatPanelRef, bottomRef, {
+    answerCount,
+    lastMessageKey,
+    messageCount: messages.length,
+    triggers: [
+      answerCount,
+      messages.length,
+      state.busy,
+      state.report,
+      sessionView.shouldShowStageCard,
+      lastMessageKey,
+      pendingSpeechUrl,
+    ],
+  });
   useScrollStateTelemetry(chatPanelRef, bottomRef, {
-    answerCount: state.session?.candidate_answers?.length || 0,
+    answerCount,
     lastMessagePhase: lastMessage?.phase,
     lastMessageRole: lastMessage?.role,
     messageCount: messages.length,
