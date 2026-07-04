@@ -142,10 +142,16 @@ $chatPanelSource = Get-Content -LiteralPath ".\v2\frontend\src\components\layout
 if ($chatPanelSource -notmatch 'className="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'data-testid="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'ref=\{bottomRef\}') {
     throw "ChatPanel must render a real chat-bottom-anchor bound to bottomRef."
 }
+if ($chatPanelSource -notmatch 'className="chat-scroll-slack"' -or $chatPanelSource -notmatch 'data-testid="chat-scroll-slack"') {
+    throw "ChatPanel must render chat-scroll-slack so short mobile chats can keep limited native bounce without moving the first message."
+}
 
 $browserEffectsSource = Get-Content -LiteralPath ".\v2\frontend\src\hooks\useBrowserEffects.js" -Raw
 if ($browserEffectsSource -notmatch "answerCount\s*===\s*0" -or $browserEffectsSource -notmatch "contentBottomBeforeAnchor" -or $browserEffectsSource -notmatch "visibleSafeHeight" -or $browserEffectsSource -notmatch "shouldFollowBottom") {
     throw "useAutoScrollToLatest must keep initial messages in natural flow and follow bottom only after real content reaches the composer safe area."
+}
+if ($browserEffectsSource -notmatch "SHORT_SCROLL_SLACK_PX\s*=\s*48" -or $browserEffectsSource -notmatch "updateShortScrollSlack" -or $browserEffectsSource -notmatch "shortScrollSlackHeight") {
+    throw "useAutoScrollToLatest must maintain a small dynamic short-scroll slack for limited mobile bounce."
 }
 
 $frontendSourceFiles = Get-ChildItem -LiteralPath ".\v2\frontend\src" -Recurse -File |
@@ -255,6 +261,7 @@ $requiredTestIds = @(
     "record-button",
     "chat-panel",
     "chat-bottom-anchor",
+    "chat-scroll-slack",
     "message-user",
     "message-assistant"
 )

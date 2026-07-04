@@ -3,6 +3,9 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { sendTelemetryEvent } from "../api.js";
 
 
+const SHORT_SCROLL_SLACK_PX = 48;
+
+
 function isMobileViewport() {
   if (typeof window === "undefined") return false;
   if (typeof window.matchMedia === "function") {
@@ -23,11 +26,33 @@ function scrollPanelToLatest(panelRef, bottomRef, behavior) {
 }
 
 
-function readScrollMetrics(panelRef, bottomRef) {
+function updateShortScrollSlack(panelRef, slackRef) {
+  const panel = panelRef.current;
+  const slack = slackRef?.current;
+  if (!panel || !slack) return 0;
+
+  const currentSlackHeight = slack.getBoundingClientRect?.().height || 0;
+  const naturalScrollHeight = panel.scrollHeight - currentSlackHeight;
+  const slackHeight = isMobileViewport()
+    ? Math.max(0, panel.clientHeight + SHORT_SCROLL_SLACK_PX - naturalScrollHeight)
+    : 0;
+  const nextHeight = `${Math.ceil(slackHeight)}px`;
+
+  if (slack.style.flexBasis !== nextHeight) {
+    slack.style.flexBasis = nextHeight;
+    slack.style.minHeight = nextHeight;
+  }
+
+  return Math.ceil(slackHeight);
+}
+
+
+function readScrollMetrics(panelRef, bottomRef, slackRef) {
   const panel = panelRef.current;
   if (!panel) return null;
   const bottomAnchor = bottomRef.current;
   const bottomAnchorHeight = bottomAnchor?.getBoundingClientRect?.().height || 0;
+  const shortScrollSlackHeight = slackRef?.current?.getBoundingClientRect?.().height || 0;
   const contentBottomBeforeAnchor = bottomAnchor ? bottomAnchor.offsetTop : panel.scrollHeight;
   const visibleSafeHeight = Math.max(0, panel.clientHeight - bottomAnchorHeight);
   const distanceFromBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
@@ -42,19 +67,20 @@ function readScrollMetrics(panelRef, bottomRef) {
     scrollHeight: panel.scrollHeight,
     scrollTop: panel.scrollTop,
     shouldFollowBottom,
+    shortScrollSlackHeight,
     visibleSafeHeight,
   };
 }
 
 
-function shouldScrollToLatest(panelRef, bottomRef, options, previousStateRef) {
+function shouldScrollToLatest(panelRef, bottomRef, slackRef, options, previousStateRef) {
   const mobile = isMobileViewport();
   if (!mobile) return true;
 
   const answerCount = options.answerCount || 0;
   if (answerCount === 0) return false;
 
-  const metrics = readScrollMetrics(panelRef, bottomRef);
+  const metrics = readScrollMetrics(panelRef, bottomRef, slackRef);
   if (!metrics?.shouldFollowBottom) return false;
 
   const previous = previousStateRef.current;
@@ -68,7 +94,7 @@ function shouldScrollToLatest(panelRef, bottomRef, options, previousStateRef) {
 }
 
 
-export function useAutoScrollToLatest(panelRef, bottomRef, options) {
+export function useAutoScrollToLatest(panelRef, bottomRef, slackRef, options) {
   const previousStateRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -85,7 +111,8 @@ export function useAutoScrollToLatest(panelRef, bottomRef, options) {
     previousStateRef.current = nextState;
 
     const runIfNeeded = (nextBehavior) => {
-      if (shouldScrollToLatest(panelRef, bottomRef, options, { current: previousState })) {
+      updateShortScrollSlack(panelRef, slackRef);
+      if (shouldScrollToLatest(panelRef, bottomRef, slackRef, options, { current: previousState })) {
         scrollPanelToLatest(panelRef, bottomRef, nextBehavior);
       }
     };
@@ -115,7 +142,7 @@ export function useAutoScrollToLatest(panelRef, bottomRef, options) {
 }
 
 
-export function useScrollStateTelemetry(panelRef, bottomRef, sessionView) {
+export function useScrollStateTelemetry(panelRef, bottomRef, slackRef, sessionView) {
   const lastAnswerCountRef = useRef(null);
 
   useEffect(() => {
@@ -131,7 +158,8 @@ export function useScrollStateTelemetry(panelRef, bottomRef, sessionView) {
     const timer = window.setTimeout(() => {
       const panel = panelRef.current;
       if (!panel) return;
-      const metrics = readScrollMetrics(panelRef, bottomRef);
+      updateShortScrollSlack(panelRef, slackRef);
+      const metrics = readScrollMetrics(panelRef, bottomRef, slackRef);
       if (!metrics) return;
       sendTelemetryEvent("ui-scroll-state", {
         answerCount,
@@ -147,6 +175,7 @@ export function useScrollStateTelemetry(panelRef, bottomRef, sessionView) {
         scrollHeight: Math.round(metrics.scrollHeight || 0),
         scrollTop: Math.round(metrics.scrollTop || 0),
         shouldFollowBottom: Boolean(metrics.shouldFollowBottom),
+        shortScrollSlackHeight: Math.round(metrics.shortScrollSlackHeight || 0),
         stageVisible: Boolean(sessionView.stageVisible),
         visibleSafeHeight: Math.round(metrics.visibleSafeHeight || 0),
       });
@@ -156,6 +185,7 @@ export function useScrollStateTelemetry(panelRef, bottomRef, sessionView) {
   }, [
     panelRef,
     bottomRef,
+    slackRef,
     sessionView?.answerCount,
     sessionView?.lastMessagePhase,
     sessionView?.lastMessageRole,

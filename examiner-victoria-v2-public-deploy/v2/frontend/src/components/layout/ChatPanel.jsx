@@ -17,6 +17,7 @@ export function ChatPanel({
   playPendingSpeech,
   report,
   retryLastRecording,
+  shortScrollSlackRef,
 }) {
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
@@ -75,6 +76,7 @@ export function ChatPanel({
       ) : null}
 
       <div className="chat-bottom-anchor" ref={bottomRef} data-testid="chat-bottom-anchor" aria-hidden="true" />
+      <div className="chat-scroll-slack" ref={shortScrollSlackRef} data-testid="chat-scroll-slack" aria-hidden="true" />
     </main>
   );
 }

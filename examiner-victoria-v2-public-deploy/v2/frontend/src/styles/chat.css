@@ -20,6 +20,13 @@
   pointer-events: none;
 }
 
+.chat-scroll-slack {
+  flex: 0 0 0;
+  min-height: 0;
+  width: 100%;
+  pointer-events: none;
+}
+
 .message-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);

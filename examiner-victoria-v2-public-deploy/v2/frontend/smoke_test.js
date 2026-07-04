@@ -158,14 +158,19 @@ function assertChatBottomAnchorContracts() {
   assert.match(chatPanel, /className="chat-bottom-anchor"/);
   assert.match(chatPanel, /data-testid="chat-bottom-anchor"/);
   assert.match(chatPanel, /ref=\{bottomRef\}/);
+  assert.match(chatPanel, /className="chat-scroll-slack"/);
+  assert.match(chatPanel, /data-testid="chat-scroll-slack"/);
   assert.doesNotMatch(mobileCss, /\.chat-panel\s*>\s*\.message-row:first-child\s*\{[^}]*margin-top:\s*auto/s);
   assert.match(mobileCss, /padding-top:\s*clamp\(16px,\s*3vh,\s*32px\)/);
   assert.match(mobileCss, /\.chat-bottom-anchor\s*\{[^}]*flex-basis:\s*calc\(124px \+ env\(safe-area-inset-bottom\)\)/s);
   assert.match(browserEffects, /useLayoutEffect/);
+  assert.match(browserEffects, /SHORT_SCROLL_SLACK_PX\s*=\s*48/);
+  assert.match(browserEffects, /updateShortScrollSlack/);
   assert.match(browserEffects, /answerCount\s*===\s*0/);
   assert.match(browserEffects, /contentBottomBeforeAnchor/);
   assert.match(browserEffects, /visibleSafeHeight/);
   assert.match(browserEffects, /shouldFollowBottom/);
+  assert.match(browserEffects, /shortScrollSlackHeight/);
   assert.match(browserEffects, /scrollIntoView\(\{\s*behavior,\s*block:\s*"end"/s);
   assert.match(browserEffects, /distanceFromBottom/);
 }

@@ -27,6 +27,7 @@ export default function App() {
   const [state, dispatch] = useReducer(appReducer, undefined, createInitialAppState);
   const chatPanelRef = useRef(null);
   const bottomRef = useRef(null);
+  const shortScrollSlackRef = useRef(null);
   const startupRecoveryAttemptedRef = useRef(false);
   const submitAnswerRef = useRef(null);
 
@@ -159,7 +160,7 @@ export default function App() {
     state.trainingMode,
   ]);
 
-  useAutoScrollToLatest(chatPanelRef, bottomRef, {
+  useAutoScrollToLatest(chatPanelRef, bottomRef, shortScrollSlackRef, {
     answerCount,
     lastMessageKey,
     messageCount: messages.length,
@@ -173,7 +174,7 @@ export default function App() {
       pendingSpeechUrl,
     ],
   });
-  useScrollStateTelemetry(chatPanelRef, bottomRef, {
+  useScrollStateTelemetry(chatPanelRef, bottomRef, shortScrollSlackRef, {
     answerCount,
     lastMessagePhase: lastMessage?.phase,
     lastMessageRole: lastMessage?.role,
@@ -257,6 +258,7 @@ export default function App() {
         playPendingSpeech={playPendingSpeech}
         report={state.report}
         retryLastRecording={retryLastRecording}
+        shortScrollSlackRef={shortScrollSlackRef}
       />
 
       <MobileToasts
