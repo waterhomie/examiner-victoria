@@ -55,8 +55,8 @@ function Resolve-V2Gh {
 
 $repoRoot = Resolve-RealPath (Join-Path $PSScriptRoot "..\..")
 $tmpRoot = Join-Path $repoRoot "tmp"
-$stagingRoot = Join-Path $tmpRoot "examiner-victoria-v2-public-deploy"
-$outputZip = Join-Path $tmpRoot "examiner-victoria-v2-public-deploy.zip"
+$stagingRoot = Join-Path $tmpRoot "examiner-victoria-v2-deploy-bundle"
+$outputZip = Join-Path $tmpRoot "examiner-victoria-v2-deploy-bundle.zip"
 $prepareScript = Join-Path $PSScriptRoot "prepare_public_deploy_bundle.ps1"
 
 Write-Host "Preparing public deployment bundle..." -ForegroundColor Cyan
@@ -117,15 +117,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "git pull failed."
 }
 
-$targetRoot = Join-Path $cloneFull "examiner-victoria-v2-public-deploy"
+$targetRoot = $cloneFull
 if (-not (Test-IsSafeChildPath -ParentPath $cloneFull -ChildPath $targetRoot)) {
     throw "Refusing to sync outside cloned repository: $targetRoot"
 }
-if (-not (Test-Path -LiteralPath $targetRoot)) {
-    New-Item -ItemType Directory -Path $targetRoot | Out-Null
-}
 
-Get-ChildItem -LiteralPath $targetRoot -Force | Remove-Item -Recurse -Force
+Get-ChildItem -LiteralPath $targetRoot -Force |
+    Where-Object { $_.Name -ne ".git" } |
+    Remove-Item -Recurse -Force
 Get-ChildItem -LiteralPath $stagingRoot -Force |
     Copy-Item -Destination $targetRoot -Recurse -Force
 
@@ -139,7 +138,7 @@ if (-not $changed) {
     return
 }
 
-& $git -C $cloneFull add examiner-victoria-v2-public-deploy
+& $git -C $cloneFull add .
 if ($LASTEXITCODE -ne 0) {
     throw "git add failed."
 }

@@ -110,7 +110,7 @@ powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\prepare_public_deploy_
 The zip is written to:
 
 ```text
-tmp/examiner-victoria-v2-public-deploy.zip
+tmp/examiner-victoria-v2-deploy-bundle.zip
 ```
 
 Use that zip as the source for a new private GitHub repository, or keep it as a

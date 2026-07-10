@@ -72,14 +72,14 @@ foreach ($marker in @(".env", "node_modules", "v2/frontend/dist", "tmp")) {
 }
 
 $bundleScript = Get-Content -LiteralPath ".\v2\scripts\prepare_public_deploy_bundle.ps1" -Raw
-foreach ($marker in @("examiner-victoria-v2-public-deploy.zip", "Test-ShouldIncludeBundlePath", "Dockerfile", "deploy", "railway.json", "render.yaml", "secretPattern")) {
+foreach ($marker in @("examiner-victoria-v2-deploy-bundle.zip", "Test-ShouldIncludeBundlePath", "Dockerfile", "deploy", "railway.json", "render.yaml", "secretPattern")) {
     if (-not $bundleScript.Contains($marker)) {
         throw "prepare_public_deploy_bundle.ps1 is missing expected marker: $marker"
     }
 }
 
 $syncScript = Get-Content -LiteralPath ".\v2\scripts\sync_public_deploy_github.ps1" -Raw
-foreach ($marker in @("param(", "-Push", "Dry run complete", "gh auth status", "examiner-victoria-v2-public-deploy", "git push")) {
+foreach ($marker in @("param(", "-Push", "Dry run complete", "gh auth status", "git push", "add .")) {
     if (-not $syncScript.Contains($marker)) {
         throw "sync_public_deploy_github.ps1 is missing expected marker: $marker"
     }

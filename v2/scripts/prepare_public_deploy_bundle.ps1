@@ -72,7 +72,7 @@ if (-not (Test-Path -LiteralPath $tmpRoot)) {
 }
 
 if (-not $OutputZip) {
-    $OutputZip = Join-Path $tmpRoot "examiner-victoria-v2-public-deploy.zip"
+    $OutputZip = Join-Path $tmpRoot "examiner-victoria-v2-deploy-bundle.zip"
 }
 
 $outputZipFull = if ([System.IO.Path]::IsPathRooted($OutputZip)) {
@@ -84,7 +84,7 @@ if (-not (Test-IsSafeChildPath -ParentPath $repoRoot -ChildPath $outputZipFull))
     throw "OutputZip must be inside the project workspace: $repoRoot"
 }
 
-$stagingRoot = Join-Path $tmpRoot "examiner-victoria-v2-public-deploy"
+$stagingRoot = Join-Path $tmpRoot "examiner-victoria-v2-deploy-bundle"
 $stagingFull = [System.IO.Path]::GetFullPath($stagingRoot)
 $tmpFull = [System.IO.Path]::GetFullPath($tmpRoot)
 if (-not (Test-IsSafeChildPath -ParentPath $tmpFull -ChildPath $stagingFull)) {
