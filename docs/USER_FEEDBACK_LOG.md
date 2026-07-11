@@ -1,409 +1,196 @@
-﻿# Examiner Victoria V2｜用户反馈与产品决策
+# Examiner Victoria V2 User Feedback And Product Decisions
 
-## 1. 记录说明
+## 1. Record Notes
 
-- 测试时间：2026-07
-- 产品版本：Examiner Victoria V2
-- 测试环境：移动端 Web App
-- 测试人数：2 名
-- 测试方式：真实产品体验后的开放式反馈
-- 隐私处理：本文只保存匿名化产品反馈；原始聊天及身份信息保存在 Git 仓库之外。公开文档不保存测试者真实姓名、微信昵称、头像、联系方式、账号、完整口语回答、录音或原始聊天截图。
+- Test period: 2026-07
+- Product version: Examiner Victoria V2
+- Test surface: mobile Web App
+- Testers: 2 anonymized testers
+- Method: open feedback after real product use
+- Privacy: this document stores anonymized product feedback only. Original chats, identities, answers, audio, screenshots, and contact details are kept outside the Git repository.
 
-## 2. 核心结论
+## 2. Core Findings
 
-- 用户不仅需要“指出错误”，更需要明确、可执行的下一步改进动作。
-- 用户对练习模式和正式模考模式有不同预期。
-- 有语音播放功能不等于具备真实考试体验；模考沉浸感与聊天框、实时转写、逐轮反馈是否隐藏直接相关。
-- 用户希望 Part 3 同时具备标准化题库的稳定性和基于回答追问的对话感。
-- 用户提出的“五五开”不应转化为固定算法比例；产品应优先验证问题质量、相关性和回退稳定性。
-- 用户对动态追问和自主选题有明确需求，其中自主选题在当前 V2 已有基础能力。
-- 发音评分必须明确技术边界，不能用语音转写后的文本分析假装完成声学发音评分。
-- 练习记录需求成立，但当前阶段不一定需要立即引入账号和云端数据库。
-- 用户反馈应进入产品决策记录，而不是机械转化为功能清单。
+- Users need direct, actionable next-step guidance, not only error identification.
+- Practice Mode and Mock / Exam Mode have different user expectations.
+- Voice playback alone does not create a realistic exam experience; exam immersion depends on reducing chat bubbles, live transcript display, and per-turn feedback during the test.
+- Part 3 needs both stable IELTS-style question-bank structure and answer-driven follow-up.
+- A tester's intuitive ratio request should not become a fixed algorithmic ratio; quality, relevance, and fallback stability matter more.
+- Pronunciation scoring must be stated as a product boundary because transcription text is not acoustic scoring.
+- Practice history is a valid need, but cloud accounts and databases can remain Roadmap for V2.
 
-## 3. 反馈总表
+## 3. Feedback Table
 
-| 编号 | 测试者 | 用户反馈 | 产品问题 | 当前能力 | 产品决策 | 优先级 | 状态 |
+| ID | Tester | User feedback | Product issue | Current capability | Product decision | Priority | Status |
 |---|---|---|---|---|---|---|---|
-| F-001 | T001 | 希望模考过程中主要通过考官语音和考生语音交互，不以文字聊天框为主要界面。 | 当前聊天式界面适合陪练，但可能削弱正式模考沉浸感，并让用户依赖文字题目和实时转写。 | 已有 TTS、录音、转写、连续流程、Part 2 Cue Card 和准备倒计时，但整体仍以聊天消息界面呈现。 | 保留 Practice Mode，将语音优先、隐藏实时聊天记录、结束后统一反馈的 Mock / Exam Mode 作为独立体验方向。 | P1 | 待设计与验证 |
-| F-002 | T001 | 长回答错误较多时，希望系统覆盖主要问题。 | 反馈覆盖范围与用户记忆负担之间的平衡。 | 当前反馈结构偏简洁，包含 correction、expression tip、natural version。 | 不机械罗列所有错误，先验证“抓主问题 + 给行动”的策略。 | P1 | 待验证 |
-| F-003 | T002 | 建议有时不够直接，希望更具体、可执行。 | 反馈是否能指导下一轮练习。 | 当前有快速纠错、表达建议和自然版本，但未固定“原因/做法/下一步任务”。 | 建立测试样本验证更直接的反馈结构，不立即重写评分系统。 | P1 | 待验证 |
-| F-004 | T001 | 希望 Part 3 既包含稳定的题库问题，也能根据 Part 2 和后续回答进行针对性追问。 | 纯题库较稳定但对话感不足；完全动态生成可能重复、跑题或难度不稳定。 | 当前后端已有参考题库、Part 2 回答摘要、最近对话上下文和题库 fallback。 | 采用“题库主干 + 回答驱动追问 + 题库回退”的混合策略，不设置固定 50% 比例。 | P1 | 基本实现，待质量验证 |
-| F-005 | T001 | 当前无法真正评估发音，无法完整覆盖雅思四项评分。 | 产品能力边界是否讲清楚。 | 当前基于转写文本、回答时长和 WPM；未做声学发音评分。 | 明确不宣称完整四项评分，不用转写文本假装发音评分。 | P0 | 产品边界 |
-| F-006 | T001 | 希望可以选择具体练习主题，例如 Part 1 的 Flowers。 | 用户是否能按目标主题练习。 | 已有 `/api/practice-options`、Part 1 topic select、Part 2/3 cue card select；当前题库搜索未确认 Flowers 主题。 | 需求已验证；先观察入口可发现性，再决定是否补充具体主题。 | P1 | 部分解决 |
-| F-007 | T001 | 希望保存个人练习记录。 | 保存范围是本地导出、本地恢复，还是云端长期档案。 | 已有 report/transcript/practice record 导出和 localStorage 会话恢复。 | 当前保留本地能力；账号、数据库、跨设备历史放入 Roadmap。 | Roadmap | 部分解决 |
-| F-008 | T002 | 希望更接近真人的实时对话体验，并提到其他 AI Live 产品。 | 真人感与互动节奏，而不只是语音按钮。 | React + FastAPI 已支持连续轮次、状态提示、TTS 播放，但不是全双工 Live Voice。 | 先做低成本节奏优化；全双工实时语音列入长期 Roadmap。 | P2 / Roadmap | 长期 Roadmap |
+| F-001 | T001 | Wants mock tests to rely mainly on examiner voice and candidate voice, rather than a text-chat interface. | The chat interface is useful for coaching, but can weaken exam immersion and make users rely on text and live transcript. | V2 has TTS, recording, transcription, continuous flow, Part 2 Cue Card, prep timer, and a minimal voice-first Mock view. | Keep Practice Mode. In Mock / Exam Mode, hide the main chat stream and live transcript, keep Part 2 Cue Card, and show feedback after the test. | P1 | Minimal version implemented, needs validation |
+| F-002 | T001 | For long answers with many mistakes, wants the system to cover the main issues. | Balance correction coverage with cognitive load. | Current feedback gives quick correction, expression tip, and natural version. | Do not list every mistake mechanically; validate a strategy that catches the most important issues and gives a next action. | P1 | Needs validation |
+| F-003 | T002 | Suggestions can be too indirect; wants more specific, actionable advice. | Feedback must tell users what to change next. | Current structure exists but does not always explain why or how to practice next. | Build test samples for a clearer issue / reason / fix / example / next-task structure before rewriting scoring. | P1 | Needs validation |
+| F-004 | T001 | Wants Part 3 to include stable bank questions and targeted follow-up based on Part 2 or later answers. | Pure bank questions are stable but less conversational; fully dynamic questions can repeat, drift, or vary in difficulty. | Backend now supports bank backbone, answer-driven follow-up, fallback, short-answer guard, and no consecutive dynamic follow-up. | Use question-bank backbone + answer-driven follow-up + question-bank fallback. Do not set a fixed ratio. | P1 | Strategy implemented, quality needs validation |
+| F-005 | T001 | Current product cannot truly evaluate pronunciation or fully cover all IELTS scoring criteria. | Product boundary must be clear. | Current system uses transcript text, duration, and WPM; it does not perform acoustic pronunciation scoring. | Do not claim full pronunciation scoring or full official IELTS scoring. Acoustic pronunciation scoring remains Roadmap. | P0 | Product boundary |
+| F-006 | T001 | Wants to choose specific practice topics, such as a Part 1 flowers topic. | Users need targeted practice. | V2 has practice options, Part 1 topic selection, and Part 2 / Part 3 cue-card selection. | Keep the selection flow and validate discoverability; content coverage can be expanded later if demand repeats. | P1 | Partially solved |
+| F-007 | T001 | Wants personal practice records to be saved. | Need to distinguish local export, local recovery, and cloud history. | V2 has report, transcript, practice-record export, and local session recovery. | Keep local export/recovery in V2. Accounts, database history, and cross-device records are Roadmap. | Roadmap | Partially solved |
+| F-008 | T002 | Wants a more live, human-like conversation experience. | This is interaction rhythm, not just a voice button. | React + FastAPI supports continuous turns and TTS, but not full-duplex live voice. | Improve low-cost rhythm first; full-duplex live voice remains Roadmap. | P2 / Roadmap | Roadmap |
 
-## 4. 详细反馈与决策
+## 4. Detailed Decisions
 
-### F-001｜语音优先的真实考试模拟
+### F-001 | Voice-first realistic mock exam
 
-#### 用户反馈
+The user is not mainly asking for a clearer Play button. The request is for a distinct exam experience where the examiner asks mainly by voice, the candidate answers mainly by voice, and the interface does not center full chat history, live transcript, or immediate per-turn coaching.
 
-希望考试过程中主要通过考官语音与考生语音完成交互，不以文字聊天框、聊天气泡、实时转写和即时反馈作为主要体验，更接近真实雅思口语考试。
+Current V2 supports the technical base: TTS, user recording, transcription, continuous flow, Part 2 Cue Card, prep timer, final report, and transcript. The current implementation adds a minimal Mock / Exam view: Practice Mode still shows the learning chat, while Mock Mode hides the main chat stream during Part 1 and Part 3, keeps Part 2 Cue Card visible, and leaves feedback for the end.
 
-#### 当前能力
+Product decision:
 
-当前 V2 已具备：
+- Keep the current Practice Mode for learning and revision.
+- Keep Mock / Exam Mode as a separate voice-first experience.
+- Part 1: voice-first question and answer, with optional text fallback.
+- Part 2: still show Cue Card, prompts, and preparation timer.
+- Part 2 answer stage: mainly continuous voice answer.
+- Part 3: voice-first discussion.
+- During the mock, do not show per-turn correction, expression coaching, or full transcript as the main UI.
+- After the mock, show transcript, score/report, and downloads.
 
-- 考官 TTS 语音；
-- 用户录音；
-- 语音转写；
-- 连续考试流程；
-- Part 2 Cue Card；
-- Part 2 准备倒计时；
-- 考试报告与 Transcript。
+Status: P1, minimal version implemented, needs 3-5 tester validation.
 
-相关代码证据包括 `/api/tts`、TTS 播放逻辑、用户录音、语音转写、pending speech、Part 2 Cue Card 和准备倒计时。
+### F-002 | Long-answer correction coverage
 
-但当前界面仍以聊天消息呈现为主，更偏向 AI 陪练，而不是沉浸式模考。现有语音基础说明产品可以支持语音交互，但不能证明已经形成独立的语音优先模考体验。
+Do not mechanically list every error. That would make feedback too long, harder to remember, and slower to generate. The better strategy is:
 
-#### 产品问题
+1. Identify the issue that most affects accuracy or understanding.
+2. Give one expression improvement.
+3. Provide one natural answer version.
+4. Add one next practice action when needed.
+5. Mention that minor issues may remain when the answer is very long.
 
-需要明确区分：
+Status: P1, needs validation before prompt changes.
 
-- 适合学习的即时反馈界面；
-- 适合模考的低文字干扰界面。
+### F-003 | More direct feedback
 
-用户提出的不是单纯增加播放按钮，而是模式和交互逻辑层面的差异。Practice Mode 可以保留问题文字、聊天记录、用户转写、每轮纠错、自然表达建议和语音播放；Mock / Exam Mode 则应减少文字干扰，并在考试结束后统一展示 Transcript、评分与反馈。
+A stronger feedback structure should answer:
 
-#### 产品决策
+- What is the problem?
+- Why does it matter?
+- How should the user fix it?
+- What is one rewritten example?
+- What should the user practice next?
 
-- 不删除现有聊天式 Practice Mode；
-- 不立即重构整个产品；
-- 将 Mock / Exam Mode 作为独立体验方向；
-- 本轮只修正文档，不开发 Mock Mode；
-- 先画低保真流程并用 3–5 名用户验证，再决定是否开发。
+Status: P1, needs test samples before scoring or prompt rewrite.
 
-#### 模考模式建议
+### F-004 | Part 3 question-bank backbone and answer-driven follow-up
 
-1. Part 1：考官语音提问，隐藏主要聊天气泡与实时转写；
-2. Part 2：显示 Cue Card、提示要点和 1 分钟准备倒计时；
-3. Part 2 回答阶段：以连续录音为主；
-4. Part 3：恢复语音优先的口头讨论；
-5. 考试过程中不逐轮展示纠错；
-6. 考试结束后统一展示 Transcript、评分和反馈。
+The user's ratio wording is best understood as a request for mixed questioning, not as a strict algorithm. The goal is stable IELTS-style structure plus natural follow-up when the answer gives enough substance.
 
-#### 当前状态
+Current implementation:
 
-- 优先级：P1
-- 状态：待设计与验证
-- 本轮不进入功能开发
-### F-002｜长回答的纠错覆盖
+- The first Part 3 question comes from the selected cue-card question bank.
+- Meaningful answers can trigger an answer-driven dynamic follow-up.
+- Dynamic follow-up is limited so it does not appear twice in a row.
+- After one dynamic follow-up, the flow returns to bank backbone or fallback.
+- Short answers, missing context, provider failure, empty output, duplicate output, invalid output, or over-specific output fall back safely.
+- Source tracking can mark questions as `bank`, `dynamic`, or `fallback`.
 
-当前仓库证据：
-
-- `v2/backend/feedback_service.py` 使用 `CORRECTION`、`EXPRESSION_TIP`、`UPGRADED_ANSWER` 三个字段。
-- `LONG_ANSWER_WORD_THRESHOLD = 45` 已区分长短回答。
-- 当前 prompt 要求 correction 和 expression tip 各保持为 one short sentence。
-
-产品判断：不建议机械罗列所有错误，因为会造成：
-
-- 反馈过长；
-- 用户记不住；
-- 小错误掩盖核心问题；
-- 增加模型延迟和成本。
-
-建议反馈策略：
-
-1. 指出 1 个最影响准确性或理解的问题；
-2. 给出 1 个最值得改进的表达；
-3. 提供 1 个自然版本；
-4. 给出 1 条下一轮可执行练习建议；
-5. 必要时提示仍存在其他次要问题。
-
-产品决策：本轮不修改 Prompt。先用真实和合成样本验证用户是否觉得“抓住主要问题”比“列出所有错误”更有帮助。
-
-状态：待验证。
-
-### F-003｜反馈建议不够直接
-
-当前仓库证据：
-
-- `feedback_service.py` 可以输出快速纠错、表达建议和自然版本。
-- 当前结构未固定包含“为什么需要改”和“下一轮练习任务”。
-
-这是本轮最值得优先处理的反馈之一。将“更具体的改进建议”拆为固定反馈结构：
-
-- 具体问题是什么；
-- 为什么需要改；
-- 应该怎样改；
-- 一个改写示例；
-- 下一轮练习任务。
-
-产品决策：
-
-- 先用测试样本验证反馈结构；
-- 不立即重写整套评分系统；
-- 建立 10 条短、中、长回答测试集；
-- 检查建议是否具体、可操作、不过度冗长。
-
-优先级：P1。
-
-状态：待验证。
-
-### F-004｜Part 3 题库主干与回答驱动追问
-
-#### 用户反馈
-
-希望 Part 3 不只是固定题库，也能根据 Part 2 和用户后续回答进行有针对性的追问。
-
-用户提到的“一半题库、一半动态生成”应视为对混合出题方式的直观表达，而不是必须照做的固定比例。
-
-#### 当前能力
-
-根据当前仓库代码：
-
-- `v2/backend/question_bank_service.py` 统计 `part3_reference_questions`，并从 cue card 中提供 Part 3 参考问题；
-- `v2/backend/part3_service.py` 的 prompt 包含 `Reference Part 3 question bank`、`Candidate Part 2 answer summary` 和 `Recent Part 3 exchange`；
-- `generate_next_part3_question()` 支持动态生成下一题；
-- 动态生成失败、重复或无效时，`fallback_part3_question()` 会从 cue card 题库和 generic pool 中选择回退问题；
-- `exam_flow_service.py` 在 Part 2 follow-up 后进入 Part 3，并调用 `generate_next_part3_question(session)`。
-
-当前判断：已经具备“参考题库 + Part 2 回答摘要 + 最近 Part 3 对话 + 动态生成 + 题库回退”的基础能力，但尚未验证题目质量和混合策略是否稳定。
-
-#### 产品问题
-
-需要平衡：
-
-- 题库题目的稳定性和雅思风格；
-- 动态追问的相关性和对话感；
-- 问题难度的一致性；
-- 上下文不足时的安全回退。
-
-固定 50% 题库题目 + 50% AI 动态问题不是产品目标，因为：
-
-1. 用户回答过短时，可能没有足够信息生成高质量追问；
-2. 动态问题可能重复、跑题、过度具体或难度不稳定；
-3. 有些高质量回答值得连续追问，不适合被固定比例打断；
-4. Part 3 需要保持更一般、更抽象、更深入的讨论；
-5. 稳定性和对话相关性比固定数量比例更重要。
-
-#### 产品决策
-
-采用：
+Product decision:
 
 ```text
-题库主干 + 回答驱动追问 + 题库回退
+question-bank backbone + answer-driven follow-up + question-bank fallback
 ```
 
-不设置固定五五开比例。
+Do not set a fixed ratio. Dynamic follow-up should depend on answer substance, repeat risk, Part 3 abstractness, and generation quality.
 
-动态追问是否出现，应根据：
+Validation focus:
 
-- 用户回答中是否有值得深入的观点；
-- 是否存在可追问的原因、例子、影响或比较；
-- 当前问题是否已经重复；
-- 是否仍符合 Part 3 的抽象讨论特点；
-- 模型生成结果是否有效。
+1. Does the dynamic question connect to the user's answer?
+2. Does it avoid repetition?
+3. Does it stay analytical rather than personal?
+4. Does short-answer fallback feel stable?
+5. Does the mix feel more like a real examiner?
 
-一种可能的混合流程是：
+Status: P1, strategy implemented, quality needs validation.
 
-```text
-第 1 题：与 Part 2 主题相关的题库主问题
-第 2 题：根据用户上一轮观点追问原因、例子或影响
-第 3 题：回到更一般或更抽象的题库问题
-第 4 题：根据用户回答进行比较、评价或未来趋势追问
-```
+### F-005 | Pronunciation scoring boundary
 
-这只是示例流程，不是固定出题顺序或硬编码比例。
+Current V2 can assess content, relevance, some grammar and vocabulary issues, duration, and WPM. It cannot formally assess phonemes, stress, connected speech, rhythm, intonation, or acoustic pronunciation quality.
 
-#### 验证重点
+Decision: do not claim full pronunciation scoring in V2. Formal acoustic pronunciation scoring remains Roadmap.
 
-1. 动态问题是否与 Part 2 主题相关；
-2. 是否真正承接用户上一轮观点；
-3. 是否避免重复；
-4. 是否避免过度具体，仍保持 Part 3 的抽象讨论；
-5. 回答过短或信息不足时是否回退题库；
-6. 动态问题与题库问题整体难度是否协调；
-7. 用户是否感到更像真实对话，而不是随机换题。
+### F-006 | Topic selection
 
-#### 状态
+V2 supports selectable Part 1 topics and selectable Part 2 / Part 3 cue cards. The next question is discoverability and content coverage, not whether the selection mechanism exists.
 
-- 优先级：P1
-- 状态：基本实现，待质量验证
-- 本轮不修改生成算法
-### F-005｜发音评分边界
+### F-007 | Practice records
 
-当前系统可以判断：
+V2 supports local report, transcript, practice-record export, and local session recovery. It does not yet support accounts, cloud history, cross-device history, or long-term learning profiles.
 
-- 内容展开；
-- 切题程度；
-- 部分语法问题；
-- 词汇和表达自然度；
-- 回答时长与语速统计。
+### F-008 | Human-like live conversation
 
-当前不能正式评价：
+This is about rhythm and presence, not only a voice feature. Full-duplex live voice requires streaming STT, streaming TTS, interruption handling, and higher cost. V2 should first validate lower-cost improvements: clearer listening/thinking/speaking states, better examiner wording, controllable replay, and lower perceived waiting time.
 
-- 音素准确度；
-- 重音；
-- 连读；
-- 韵律；
-- 声学层面的发音质量。
+## 5. Priority Summary
 
-产品决策：
+### P0 | Clarify immediately
 
-- 不宣称完整覆盖雅思四项评分标准；
-- 不使用转写文本假装完成发音评分；
-- 将正式声学发音评分列入长期 Roadmap。
+- Pronunciation scoring boundary.
+- No exaggerated claim of full official IELTS scoring.
+- Feedback remains anonymized.
 
-状态：产品边界。
+### P1 | Next product validation
 
-### F-006｜自主选择练习主题
+- Is feedback direct and actionable enough?
+- Does long-answer feedback catch the most important issues?
+- Does Part 3 dynamic follow-up connect naturally to the previous answer?
+- Does Part 3 fallback work when answers are short or generation fails?
+- Does the voice-first Mock / Exam Mode feel closer to a real exam?
+- Do users prefer per-turn feedback or final-only feedback in mock tests?
+- Is topic/cue-card selection easy to find?
 
-当前仓库证据：
+### P2 | Low-cost experience improvements
 
-- `GET /api/practice-options` 返回 selectable Part 1 topics 和 Part 2/3 cue-card titles。
-- `question_bank_service.py` 的 `choose_part1_topic(topic_name)` 和 `choose_cue_card(cue_card_title)` 支持按名称选择。
-- `ExamStageCard.jsx` 在 Part 1 显示 Topic select，在 Part 2 / Part 3 显示 Cue card select。
-- 代码搜索未确认当前题库中存在 `Flowers` 具体主题。
-
-产品判断：自主选题能力已存在，但测试者提出的具体 Flowers 需求需要核对题库覆盖。这里不应直接承诺“Flowers 已支持”。
-
-产品决策：
-
-- 用户需求：已验证；
-- 当前状态：部分解决；
-- 后续验证：观察用户是否容易发现选题入口；
-- 后续内容工作：如 Flowers 是高频需求，再评估是否补充到题库。
-
-状态：部分解决。
-
-### F-007｜练习记录
-
-当前仓库证据：
-
-- `ChatPanel.jsx` 提供 Download report、Download transcript、Download practice record。
-- `useExamController.js` 中有 `downloadReport()`、`downloadTranscript()`、`downloadPracticeRecord()`。
-- `sessionStorage.js` 使用 `localStorage` 保存和恢复当前会话 snapshot。
-
-当前已有：
-
-- 报告导出；
-- Transcript 导出；
-- Practice Record 导出；
-- 本地会话恢复。
-
-当前尚未实现：
-
-- 用户账号；
-- 云端数据库；
-- 跨设备历史记录；
-- 长期个人学习档案。
-
-产品决策：
-
-- 当前阶段保留本地导出和本地恢复；
-- 不立即引入账号和数据库；
-- 云端历史记录放入长期 Roadmap。
-
-状态：部分解决。
-
-### F-008｜更接近真人的 Live 对话体验
-
-用户需求可以拆分为：
-
-- 更自然的轮流说话；
-- 更短的等待时间；
-- 更明确的正在听 / 正在思考 / 正在回答状态；
-- 更自然的考官语气；
-- 连续对话感；
-- 必要时支持打断或快速响应。
-
-产品判断：
-
-- 这是“真人感和互动节奏”问题，不只是增加一个语音按钮。
-- 当前 React + FastAPI 架构已经比 Streamlit 更适合连续交互。
-- 真正的全双工 Live Voice 涉及流式 STT、流式 TTS、打断机制和更高成本。
-- 当前阶段不立即做全双工实时语音。
-
-低成本验证方向：
-
-1. 缩短反馈等待感；
-2. 增加明确的状态提示；
-3. 优化考官语言风格；
-4. 提高语音重播与连续播放的可控性。
-
-优先级：低成本对话感优化为 P2；全双工 Live Voice 为长期 Roadmap。
-
-状态：长期 Roadmap。
-
-## 5. 优先级结论
-
-### P0｜立即明确
-
-- 发音评分能力边界；
-- 不夸大四项评分能力；
-- 原始反馈匿名化。
-
-### P1｜下一轮产品验证
-
-- 反馈是否足够直接、具体、可执行；
-- 长回答反馈是否抓住最重要的 2–3 个问题；
-- Part 3 动态追问是否承接上一轮观点；
-- Part 3 问题是否符合抽象讨论特点；
-- Part 3 是否存在重复、跑题或难度波动；
-- 用户回答信息不足时能否稳定回退题库；
-- 用户是否觉得题库问题与动态追问组合自然；
-- 用户是否需要独立的语音优先 Mock / Exam Mode；
-- 用户是否希望模考过程中隐藏聊天气泡和实时转写；
-- 用户更偏好逐轮反馈还是考试结束后统一反馈；
-- Part 2 Cue Card 和准备倒计时是否符合真实考试预期；
-- 自主选题入口是否容易发现。
-
-### P2｜低成本体验优化
-
-- 等待状态和反馈状态提示；
-- 对话节奏；
-- 更自然的考官语言；
-- 播放和重播体验。
+- Waiting and feedback state clarity.
+- Conversation rhythm.
+- More natural examiner wording.
+- Playback and replay experience.
 
 ### Roadmap
 
-- 全双工 Live Voice；
-- 正式声学发音评分；
-- 用户账号；
-- 数据库练习历史；
-- 跨设备记录。
+- Full-duplex live voice.
+- Formal acoustic pronunciation scoring.
+- User accounts.
+- Database-backed practice history.
+- Cross-device records.
 
-## 6. 下一轮用户测试计划
+## 6. Next User Test Plan
 
-- 测试人数：3–5 人
-- 测试设备：iPhone / Android
-- 测试场景：
-  1. Part 1 自选主题；
-  2. 一条错误较多的长回答；
-  3. Part 2 到 Part 3 连续练习；
-  4. 同一 Part 2 主题下做 Part 3 A/B 对比：A 主要使用题库问题，B 使用题库主干 + 回答驱动追问；
-  5. A/B 对比：现有聊天式 Practice Mode vs 低保真语音优先 Mock Mode；
-  6. 查看并导出练习记录。
-- 观察指标：
-  - 是否能找到选题入口；
-  - 哪种模式更适合日常练习；
-  - 哪种模式更接近真实考试；
-  - 隐藏文字后用户更沉浸还是更焦虑；
-  - 是否需要同时保留两种模式；
-  - Part 2 是否需要显示 Cue Card、准备倒计时和简易笔记区；
-  - 是否理解反馈建议；
-  - 是否知道下一步怎么改；
-  - Part 3 题库主干和回答驱动追问哪种更自然；
-  - 哪种更接近真实考官追问；
-  - 动态问题是否真的利用了用户回答；
-  - 用户是否感觉问题重复或跑题；
-  - 动态追问失败时题库回退是否突兀；
-  - 是否理解发音评分边界；
-  - 是否愿意再次使用。
+- Testers: 3-5 people.
+- Devices: iPhone and Android.
+- Scenarios:
+  1. Part 1 with a selected topic.
+  2. A long answer with many issues.
+  3. Full Part 2 into Part 3 flow.
+  4. Part 3 comparison: mainly bank questions vs bank backbone with answer-driven follow-up.
+  5. Practice Mode vs minimal voice-first Mock Mode.
+  6. Report, transcript, and practice-record export.
+- Observe:
+  - Can testers find topic selection?
+  - Which mode is better for daily practice?
+  - Which mode feels closer to a real exam?
+  - Does hiding text feel immersive or stressful?
+  - Does Part 2 need Cue Card, prep timer, and notes?
+  - Are feedback suggestions actionable?
+  - Do Part 3 follow-ups use the user's answer?
+  - Does fallback feel abrupt?
+  - Do testers understand pronunciation-scoring limits?
+  - Would they use the product again?
 
-## 7. 可用于作品集的项目表述
+## 7. Portfolio Statement
 
-邀请 2 名真实用户完成移动端口语练习测试，将反馈拆分为语音交互、纠错质量、动态追问、评分边界、自主选题、练习记录和真人对话感等问题；基于用户影响、实现成本和现有能力进行优先级判断，明确已实现、待验证和长期 Roadmap，并形成下一轮 3–5 人用户测试计划。
+Invited 2 real users to test the mobile IELTS speaking practice product, converted open feedback into product problems across voice-first mock exams, correction quality, Part 3 follow-up, scoring boundaries, topic selection, practice records, and live conversation feel, then prioritized implemented, validation, and Roadmap items based on user impact, implementation cost, and current technical capability.
 
-## 8. 后续待补充问题
+## 8. Open Questions
 
-- 两位测试者使用的设备和浏览器；
-- 是否完成了完整 Part 1 / Part 2 / Part 3；
-- 用户是否实际找到语音重播入口；
-- “建议不直接”的具体案例；
-- 用户认为最接近真人对话的产品是哪一个；
-- 用户是否愿意长期保存练习记录；
-- 用户是否接受只保存到本地设备。
+- What exact devices and browsers did testers use?
+- Did each tester complete full Part 1 / Part 2 / Part 3?
+- Did testers find replay controls without help?
+- What concrete examples made feedback feel indirect?
+- Which live AI product did testers compare against?
+- Would testers want local-only records or cloud records?

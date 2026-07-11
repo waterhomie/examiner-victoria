@@ -222,3 +222,8 @@ button text, which may change as the product copy becomes more polished.
 iPhone Safari requires HTTPS for microphone access except on `localhost`.
 It also requires a user gesture before audio can autoplay. The frontend should
 therefore keep an explicit tap-to-play fallback for Victoria's voice.
+
+
+## Practice And Mock Views
+
+Practice Mode renders the full learning chat: assistant questions, user transcripts, immediate feedback, replay prompts, and final report controls. Mock Mode uses the same session state but derives a reduced view model in `src/state/selectors.js`: Part 1 and Part 3 hide the main chat stream and show a voice-first mock card, while Part 2 keeps the Cue Card visible. `ChatPanel.jsx` renders the mock card and preserves report/download controls after completion.

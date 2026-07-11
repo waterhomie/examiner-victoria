@@ -190,6 +190,87 @@ def assert_focused_practice_flows(client: TestClient, chosen_topic: str, chosen_
     assert len(part3_session["part3_history"]) <= 6, part3_session
 
 
+
+def assert_part3_hybrid_strategy(client: TestClient, chosen_card: str) -> None:
+    part3_session = start_api_session(
+        client,
+        practice_type="part3",
+        cue_card_title=chosen_card,
+    )
+    first_bank_question = part3_session["cue_card"]["part3"][0]
+    assert part3_session["part3_questions"] == [first_bank_question], part3_session
+    assert part3_session["part3_question_sources"] == ["bank"], part3_session
+    assert part3_session["part3_consecutive_dynamic"] == 0, part3_session
+
+    meaningful_answer = (
+        "I think this issue matters because people's choices are shaped by their routines, "
+        "their family habits, and the places where they spend most of their time."
+    )
+    dynamic_payload = answer_api(client, part3_session, meaningful_answer)
+    dynamic_session = dynamic_payload["session"]
+    assert dynamic_session["part3_question_sources"][-1] == "dynamic", dynamic_session
+    assert dynamic_session["part3_consecutive_dynamic"] == 1, dynamic_session
+
+    bank_payload = answer_api(client, dynamic_session, meaningful_answer)
+    bank_session = bank_payload["session"]
+    assert bank_session["part3_question_sources"][-1] in {"bank", "fallback"}, bank_session
+    assert bank_session["part3_question_sources"][-1] != "dynamic", bank_session
+    assert bank_session["part3_consecutive_dynamic"] == 0, bank_session
+
+    short_session = start_api_session(
+        client,
+        practice_type="part3",
+        cue_card_title=chosen_card,
+    )
+    short_payload = answer_api(client, short_session, "Yes.")
+    short_session = short_payload["session"]
+    assert short_session["part3_question_sources"][-1] in {"bank", "fallback"}, short_session
+    assert short_session["part3_question_sources"][-1] != "dynamic", short_session
+
+    original_part3_call_model = part3_service.call_model
+    try:
+        def broken_part3_call_model(_messages: list[dict[str, str]], *_args, **_kwargs) -> str:
+            raise RuntimeError("part 3 provider unavailable")
+
+        part3_service.call_model = broken_part3_call_model
+        fallback_session = start_api_session(
+            client,
+            practice_type="part3",
+            cue_card_title=chosen_card,
+        )
+        fallback_payload = answer_api(client, fallback_session, meaningful_answer)
+        fallback_session = fallback_payload["session"]
+        assert fallback_session["part3_question_sources"][-1] == "fallback", fallback_session
+        assert fallback_session["part3_consecutive_dynamic"] == 0, fallback_session
+
+        def empty_part3_call_model(_messages: list[dict[str, str]], *_args, **_kwargs) -> str:
+            return ""
+
+        part3_service.call_model = empty_part3_call_model
+        empty_session = start_api_session(
+            client,
+            practice_type="part3",
+            cue_card_title=chosen_card,
+        )
+        empty_payload = answer_api(client, empty_session, meaningful_answer)
+        empty_session = empty_payload["session"]
+        assert empty_session["part3_question_sources"][-1] == "fallback", empty_session
+
+        def duplicate_part3_call_model(_messages: list[dict[str, str]], *_args, **_kwargs) -> str:
+            return fallback_session["part3_questions"][0]
+
+        part3_service.call_model = duplicate_part3_call_model
+        duplicate_session = start_api_session(
+            client,
+            practice_type="part3",
+            cue_card_title=chosen_card,
+        )
+        duplicate_payload = answer_api(client, duplicate_session, meaningful_answer)
+        duplicate_session = duplicate_payload["session"]
+        assert duplicate_session["part3_question_sources"][-1] == "fallback", duplicate_session
+    finally:
+        part3_service.call_model = original_part3_call_model
+
 def assert_mock_mode_starts_cleanly(client: TestClient) -> None:
     mock_session = start_api_session(
         client,
@@ -368,6 +449,7 @@ def main() -> None:
 
     assert_focused_practice_flows(client, chosen_topic, chosen_card)
     assert_mock_mode_starts_cleanly(client)
+    assert_part3_hybrid_strategy(client, chosen_card)
 
     too_long_answer = client.post(
         "/api/answer",

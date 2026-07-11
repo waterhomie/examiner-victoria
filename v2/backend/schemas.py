@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 Role = Literal["assistant", "user", "system"]
 PracticeType = Literal["full", "part1", "part2", "part3"]
+QuestionSource = Literal["bank", "dynamic", "fallback"]
 Phase = Literal[
     "identity",
     "part1",
@@ -68,6 +69,8 @@ class ExamSession(BaseModel):
     part3_target_count: int = 6
     part3_questions: list[str] = Field(default_factory=list)
     part3_history: list[dict[str, str]] = Field(default_factory=list)
+    part3_question_sources: list[QuestionSource] = Field(default_factory=list)
+    part3_consecutive_dynamic: int = 0
 
     answer_stats: list[AnswerStats] = Field(default_factory=list)
     candidate_answers: list[CandidateAnswer] = Field(default_factory=list)

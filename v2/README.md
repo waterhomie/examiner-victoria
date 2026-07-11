@@ -78,7 +78,7 @@ v2/
 |   |-- engine.py                 # Answer processing coordinator and reply assembly
 |   |-- exam_flow_service.py      # IELTS state machine and phase transitions
 |   |-- feedback_service.py       # Correction and natural-answer upgrade rules
-|   |-- part3_service.py          # Dynamic Part 3 follow-up generation
+|   |-- part3_service.py          # Part 3 bank backbone, dynamic follow-up, and fallback rules
 |   |-- question_bank_service.py  # Part 1/2/3 question-bank helpers
 |   |-- report_service.py         # Final reports and rule-based fallback summary
 |   |-- schemas.py                # Pydantic request/response/session models
@@ -247,6 +247,8 @@ v2/frontend/.env.example
 
 - Starts a new IELTS speaking session.
 - Supports Full, Part 1, Part 2, and Part 3 focused practice modes.
+- Practice Mode is the learning view: full chat, transcript, immediate feedback, expression coaching, and natural-answer upgrades.
+- Mock Mode is the exam view: voice-first turns, reduced real-time text, no per-turn coaching during the test, Part 2 Cue Card support, and final report review.
 - Supports random or selected Part 1 topics and Part 2/3 cue cards for focused practice.
 - Displays messages in a real React chat panel.
 - Uses a fixed iOS-style bottom composer.
@@ -258,7 +260,7 @@ v2/frontend/.env.example
 - Automatically falls back to text mode when microphone permission or transcription fails.
 - Encodes browser audio as compact 16kHz mono WAV before transcription.
 - Sends answers to the Python state machine.
-- Supports dynamic Part 3 follow-up generation through the backend.
+- Supports Part 3 hybrid questioning through the backend: question-bank backbone, answer-driven follow-up when the answer contains enough substance, and safe fallback when generation is unavailable or unsuitable.
 - Shows a refresh-safe Part 2 preparation countdown when the long-turn cue card starts.
 - Can request a current scoring report from the backend before or after completing the full test.
 - Falls back to a rule-based report if the scoring model is temporarily unavailable.

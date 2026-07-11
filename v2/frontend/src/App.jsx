@@ -187,6 +187,11 @@ export default function App() {
   usePagehideCleanup(stopCurrentAudio);
   useFrontendErrorTelemetry();
 
+  const replayCurrentQuestion = useCallback(() => {
+    const question = state.session?.current_question;
+    if (question) void playSpeech(question);
+  }, [playSpeech, state.session?.current_question]);
+
   const handleToggleRecording = useCallback(() => {
     if (!recording) {
       stopCurrentAudio();
@@ -254,8 +259,10 @@ export default function App() {
         downloadTranscript={controller.downloadTranscript}
         error={state.error}
         messages={messages}
+        mockExam={sessionView.mockExam}
         pendingSpeechUrl={pendingSpeechUrl}
         playPendingSpeech={playPendingSpeech}
+        replayCurrentQuestion={replayCurrentQuestion}
         report={state.report}
         retryLastRecording={retryLastRecording}
         shortScrollSlackRef={shortScrollSlackRef}

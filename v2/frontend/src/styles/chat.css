@@ -27,6 +27,60 @@
   pointer-events: none;
 }
 
+
+.mock-exam-card {
+  align-self: center;
+  width: min(720px, 100%);
+  padding: 16px 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.055);
+  color: var(--text);
+}
+
+.mock-exam-eyebrow {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.mock-exam-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.mock-exam-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.48;
+}
+
+.mock-exam-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 13px;
+}
+
+.mock-question-fallback {
+  flex: 1 1 260px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.mock-question-fallback summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.mock-question-fallback p {
+  margin-top: 8px;
+}
+
 .message-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);

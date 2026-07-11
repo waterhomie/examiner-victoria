@@ -97,7 +97,7 @@ v2/backend/
 - Session fields or API payload shape: `schemas.py`.
 - IELTS flow, phase transitions, or Part 3 turn count: `exam_flow_service.py`.
 - Answer logging, current-question updates, or reply assembly: `engine.py`.
-- Part 3 dynamic follow-up prompts or fallback behavior: `part3_service.py`.
+- Part 3 bank/dynamic/fallback rules, source tracking, and prompt behavior: `part3_service.py`.
 - Model name, base URL, API key loading, provider client: `ai_provider.py`.
 - Audio transcription or Victoria voice playback: `audio_services.py`.
 - Spoken correction or natural-answer upgrade rules: `feedback_service.py`.

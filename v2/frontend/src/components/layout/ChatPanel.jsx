@@ -1,6 +1,32 @@
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
 
+function MockExamCard({ mockExam, onReplayQuestion }) {
+  if (!mockExam) return null;
+  return (
+    <section className="mock-exam-card" data-testid="mock-exam-card">
+      <div>
+        <span className="mock-exam-eyebrow">Mock exam</span>
+        <h2>{mockExam.title}</h2>
+        <p>{mockExam.instruction}</p>
+      </div>
+      {mockExam.active ? (
+        <div className="mock-exam-actions">
+          <button type="button" className="ghost-button" onClick={onReplayQuestion} data-testid="replay-question-button">
+            Replay question
+          </button>
+          {mockExam.showQuestionFallback ? (
+            <details className="mock-question-fallback" data-testid="mock-question-fallback">
+              <summary>Question text fallback</summary>
+              <p>{mockExam.currentQuestion}</p>
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function ChatPanel({
   bottomRef,
   busy,
@@ -13,14 +39,18 @@ export function ChatPanel({
   downloadTranscript,
   error,
   messages,
+  mockExam,
   pendingSpeechUrl,
   playPendingSpeech,
+  replayCurrentQuestion,
   report,
   retryLastRecording,
   shortScrollSlackRef,
 }) {
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
+      <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
+
       {messages.map((message, index) => (
         <MessageBubble key={`${message.role}-${index}`} message={message} />
       ))}

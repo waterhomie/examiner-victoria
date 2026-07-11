@@ -39,6 +39,9 @@ historical-reference or security reason requires it.
 ## Core Features
 
 - IELTS Speaking Part 1, Part 2, Part 3, Full, Practice, and Mock flows
+- Practice Mode keeps the full chat, transcript, immediate correction, expression coaching, and natural-answer upgrade.
+- Mock Mode is voice-first: it hides the main chat stream and real-time transcript during the test, keeps Part 2 Cue Card support, and reserves feedback for the final report.
+- Part 3 uses a question-bank backbone with answer-driven follow-up and question-bank fallback, without a fixed dynamic-question ratio.
 - Mobile-first chat interface with fixed composer
 - Text answers and tap-to-record voice answers
 - Transcription and AI feedback

@@ -134,7 +134,10 @@ Response:
 
 The real session object contains additional fields for Part 1, Part 2, Part 3,
 answer stats, and candidate answer logs. The frontend should keep and resend the
-whole session object.
+whole session object. Part 3 also includes optional source-tracking fields such
+as `part3_question_sources` (`bank`, `dynamic`, or `fallback`) and
+`part3_consecutive_dynamic`; clients should preserve these fields but do not need
+to display them.
 
 ## POST /api/answer
 

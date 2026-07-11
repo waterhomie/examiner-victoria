@@ -12,7 +12,7 @@ import {
   sessionStartSucceeded,
 } from "./src/state/actions.js";
 import { createInitialAppState } from "./src/state/initialState.js";
-import { selectCapabilities, selectSessionView } from "./src/state/selectors.js";
+import { selectCapabilities, selectMessages, selectSessionView } from "./src/state/selectors.js";
 
 function setNavigator(value) {
   Object.defineProperty(globalThis, "navigator", {
@@ -39,6 +39,7 @@ function createSession(overrides = {}) {
     phase: "identity",
     practice_type: "full",
     test_active: true,
+    practice_mode: true,
     voice_playback_enabled: true,
     ...overrides,
   };
@@ -105,6 +106,52 @@ function assertStageCardSelector() {
   assert.equal(selectSessionView(state).shouldShowStageCard, true);
 }
 
+
+function assertMockModeSelectors() {
+  const baseMessages = [
+    { role: "assistant", phase: "identity", content: "Could you tell me your name?" },
+    { role: "user", phase: "identity", content: "My name is Water." },
+    { role: "assistant", phase: "part1", content: "Do you work, or are you a student?" },
+  ];
+  const practiceState = {
+    ...createInitialAppState(),
+    trainingMode: "practice",
+    session: createSession({ messages: baseMessages, practice_mode: true }),
+  };
+  assert.equal(selectMessages(practiceState).length, 3);
+  assert.equal(selectSessionView(practiceState).mockExam, null);
+
+  const mockPart1State = {
+    ...createInitialAppState(),
+    trainingMode: "mock",
+    session: createSession({
+      current_question: "Do you work, or are you a student?",
+      messages: baseMessages,
+      phase: "part1",
+      practice_mode: false,
+    }),
+  };
+  assert.equal(selectMessages(mockPart1State).length, 0);
+  assert.equal(selectSessionView(mockPart1State).mockExam.title, "Voice-first mock exam");
+  assert.equal(selectSessionView(mockPart1State).mockExam.showQuestionFallback, true);
+
+  const mockPart2State = {
+    ...createInitialAppState(),
+    trainingMode: "mock",
+    session: createSession({
+      messages: [
+        { role: "assistant", phase: "part2_long", content: "Part 2 cue card" },
+        { role: "user", phase: "part2_long", content: "Hidden transcript" },
+      ],
+      phase: "part2_long",
+      practice_mode: false,
+    }),
+  };
+  const visiblePart2Messages = selectMessages(mockPart2State);
+  assert.equal(visiblePart2Messages.length, 1);
+  assert.equal(visiblePart2Messages[0].content, "Part 2 cue card");
+}
+
 function assertCapabilities() {
   const state = { ...createInitialAppState(), busy: "", session: createSession() };
   assert.equal(selectCapabilities(state, false).canAnswer, true);
@@ -159,6 +206,9 @@ function assertChatBottomAnchorContracts() {
   assert.match(chatPanel, /data-testid="chat-bottom-anchor"/);
   assert.match(chatPanel, /ref=\{bottomRef\}/);
   assert.match(chatPanel, /className="chat-scroll-slack"/);
+  assert.match(chatPanel, /data-testid="mock-exam-card"/);
+  assert.match(chatPanel, /data-testid="replay-question-button"/);
+  assert.match(chatPanel, /data-testid="mock-question-fallback"/);
   assert.match(chatPanel, /data-testid="chat-scroll-slack"/);
   assert.doesNotMatch(mobileCss, /\.chat-panel\s*>\s*\.message-row:first-child\s*\{[^}]*margin-top:\s*auto/s);
   assert.match(mobileCss, /padding-top:\s*clamp\(16px,\s*3vh,\s*32px\)/);
@@ -178,6 +228,7 @@ function assertChatBottomAnchorContracts() {
 await assertApiErrorMapping();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
+assertMockModeSelectors();
 assertChatBottomAnchorContracts();
 assertReducerFlow();
 assertStageCardSelector();

@@ -8,9 +8,9 @@ from .ai_provider import call_model
 from .part3_service import (
     MOCK_PART3_QUESTION_COUNT,
     PRACTICE_PART3_QUESTION_COUNT,
+    append_part3_question,
     extract_single_question,
-    fallback_part3_question,
-    generate_next_part3_question,
+    generate_next_part3_question_with_source,
     get_part3_question_count,
 )
 from .question_bank_service import (
@@ -120,9 +120,9 @@ def start_session(
         ]
         session.current_question = cue_card["prompt"]
     elif practice_type == "part3":
-        first_part3 = fallback_part3_question(session)
+        first_part3, first_part3_source = generate_next_part3_question_with_source(session)
         session.phase = "part3"
-        session.part3_questions = [first_part3]
+        append_part3_question(session, first_part3, first_part3_source)
         session.part3_index = 0
         session.messages = [
             ChatMessage(
@@ -167,6 +167,8 @@ def handle_part1_phase(session: ExamSession, answer: str) -> tuple[str, bool]:
     session.part2_answers = []
     session.part3_questions = []
     session.part3_history = []
+    session.part3_question_sources = []
+    session.part3_consecutive_dynamic = 0
     card = session.cue_card
     next_content = (
         "**Part 2 - Long Turn**\n\n"
@@ -209,8 +211,10 @@ def handle_part2_followup_phase(session: ExamSession, answer: str) -> tuple[str,
     session.part3_target_count = get_part3_question_count(session)
     session.part3_questions = []
     session.part3_history = []
-    first_part3 = generate_next_part3_question(session)
-    session.part3_questions.append(first_part3)
+    session.part3_question_sources = []
+    session.part3_consecutive_dynamic = 0
+    first_part3, first_part3_source = generate_next_part3_question_with_source(session)
+    append_part3_question(session, first_part3, first_part3_source)
     session.phase = "part3"
     session.part3_index = 0
     return f"**Part 3 - Discussion**\n\n{first_part3}", False
@@ -228,8 +232,8 @@ def handle_part3_phase(
     session.part3_history.append({"question": current_question, "answer": answer})
     session.part3_index = len(session.part3_history)
     if session.part3_index < session.part3_target_count:
-        next_question = generate_next_part3_question(session)
-        session.part3_questions.append(next_question)
+        next_question, next_question_source = generate_next_part3_question_with_source(session)
+        append_part3_question(session, next_question, next_question_source)
         return next_question, False
 
     session.phase = "complete"
