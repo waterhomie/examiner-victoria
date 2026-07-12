@@ -81,6 +81,7 @@ RATE_LIMIT_PER_MINUTE = get_rate_limit_per_minute()
 MAX_ANSWER_CHARS = get_positive_int("MAX_ANSWER_CHARS", 4000)
 MAX_SESSION_MESSAGES = get_positive_int("MAX_SESSION_MESSAGES", 120)
 MAX_TTS_CHARS = get_positive_int("MAX_TTS_CHARS", 1200)
+TTS_TIMEOUT_SECONDS = get_positive_int("TTS_TIMEOUT_SECONDS", 10)
 TELEMETRY_MAX_EVENTS = get_positive_int("TELEMETRY_MAX_EVENTS", 500)
 ADMIN_TOKEN = get_secret("ADMIN_TOKEN", "")
 

@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { fetchRuntimeDiagnostics, healthCheck, sendTelemetryEvent } from "./src/api.js";
+import { fetchRuntimeDiagnostics, healthCheck, sendTelemetryEvent, synthesizeSpeech, TTS_TIMEOUT_MS } from "./src/api.js";
 import { browserSpeechTranscriptionIsSupported } from "./src/browserSpeechTranscriber.js";
 import { appReducer } from "./src/state/appReducer.js";
 import {
   answerRequested,
   answerSucceeded,
+  errorSet,
   practiceOptionsLoaded,
   sessionStartRequested,
   sessionStartSucceeded,
@@ -20,6 +21,7 @@ import {
   getPageEnvironment,
   getRecordingSupport,
 } from "./src/utils/runtimeDiagnostics.js";
+import { VOICE_UNAVAILABLE_MESSAGE, friendlyError } from "./src/utils/errors.js";
 
 function setNavigator(value) {
   Object.defineProperty(globalThis, "navigator", {
@@ -191,6 +193,66 @@ async function assertApiErrorMapping() {
   await assert.rejects(healthCheck(), /not reachable/);
 }
 
+async function assertTtsFailureMapping() {
+  installWindow();
+  setNavigator({ maxTouchPoints: 0, onLine: true, platform: "Win32", userAgent: "Node" });
+  assert.equal(TTS_TIMEOUT_MS, 12000);
+
+  globalThis.fetch = async (url, options) => {
+    assert.match(String(url), /\/api\/tts$/);
+    assert.equal(options?.method, "POST");
+    assert.match(String(options?.body || ""), /Hello/);
+    const error = new Error("aborted");
+    error.name = "AbortError";
+    throw error;
+  };
+  await assert.rejects(synthesizeSpeech("Hello"), new RegExp(VOICE_UNAVAILABLE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(
+    friendlyError(new Error(VOICE_UNAVAILABLE_MESSAGE), "fallback"),
+    VOICE_UNAVAILABLE_MESSAGE,
+  );
+
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 504,
+    statusText: "Gateway Timeout",
+    json: async () => ({ detail: VOICE_UNAVAILABLE_MESSAGE }),
+  });
+  await assert.rejects(synthesizeSpeech("Hello"), new RegExp(VOICE_UNAVAILABLE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.equal(
+    friendlyError(new Error("Request timed out. Victoria's server may be waking up; please try again."), "fallback"),
+    "Victoria's server is taking too long to respond. It may be waking up, so please try again in a moment.",
+  );
+}
+
+function assertTtsFailurePreservesAnswerState() {
+  const previousSession = createSession({
+    phase: "part1",
+    current_question: "Do you work, or are you a student?",
+    candidate_answers: [{ phase: "identity", answer: "My name is Water." }],
+  });
+  const nextSession = createSession({
+    phase: "part1",
+    current_question: "What do you like about your studies?",
+    candidate_answers: [
+      { phase: "identity", answer: "My name is Water." },
+      { phase: "part1", answer: "I study architecture." },
+    ],
+    messages: [
+      { role: "user", phase: "part1", content: "I study architecture." },
+      { role: "assistant", phase: "part1", content: "What do you like about your studies?" },
+    ],
+  });
+  let state = { ...createInitialAppState(), session: previousSession, busy: "thinking" };
+  state = appReducer(state, answerSucceeded(nextSession));
+  state = appReducer(state, errorSet(VOICE_UNAVAILABLE_MESSAGE));
+  assert.equal(state.error, VOICE_UNAVAILABLE_MESSAGE);
+  assert.equal(state.busy, "");
+  assert.equal(state.session.current_question, "What do you like about your studies?");
+  assert.equal(state.session.candidate_answers.length, 2);
+  assert.equal(state.session.messages.at(-1).content, "What do you like about your studies?");
+}
+
 
 function assertRuntimeDiagnosticsUtilities() {
   const wechat = analyzeUserAgent(
@@ -308,11 +370,13 @@ function assertChatBottomAnchorContracts() {
 }
 
 await assertApiErrorMapping();
+await assertTtsFailureMapping();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
 assertMockModeSelectors();
 assertChatBottomAnchorContracts();
 assertReducerFlow();
+assertTtsFailurePreservesAnswerState();
 assertStageCardSelector();
 assertTelemetryFailureIsNonBlocking();
 assertRuntimeDiagnosticsUtilities();

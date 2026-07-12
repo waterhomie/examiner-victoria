@@ -394,6 +394,16 @@ def main() -> None:
 
     original_synthesize_speech = audio_routes.synthesize_speech
     try:
+        def successful_synthesize_speech(_text: str) -> bytes:
+            return b"fake-mp3-audio"
+
+        audio_routes.synthesize_speech = successful_synthesize_speech
+        successful_tts = client.post("/api/tts", json={"text": "Hello"})
+        assert successful_tts.status_code == 200, successful_tts.text
+        assert successful_tts.headers["content-type"].startswith("audio/mpeg"), successful_tts.headers
+        assert successful_tts.headers.get("x-tts-duration-ms") is not None, successful_tts.headers
+        assert successful_tts.content == b"fake-mp3-audio", successful_tts.content
+
         def broken_synthesize_speech(_text: str) -> bytes:
             raise RuntimeError("provider voice error: internal detail")
 
@@ -402,8 +412,23 @@ def main() -> None:
         assert failed_tts.status_code == 502, failed_tts.text
         failed_tts_detail = failed_tts.json()["detail"]
         assert "internal detail" not in failed_tts_detail, failed_tts_detail
-        assert "temporarily unavailable" in failed_tts_detail, failed_tts_detail
+        assert failed_tts_detail == "Voice is temporarily unavailable. Continue with the text shown above.", failed_tts_detail
+
+        def slow_synthesize_speech(_text: str) -> bytes:
+            import time
+
+            time.sleep(1.2)
+            return b"late-audio"
+
+        original_tts_timeout = config.TTS_TIMEOUT_SECONDS
+        config.TTS_TIMEOUT_SECONDS = 1
+        audio_routes.synthesize_speech = slow_synthesize_speech
+        timed_out_tts = client.post("/api/tts", json={"text": "Hello"})
+        assert timed_out_tts.status_code == 504, timed_out_tts.text
+        timed_out_detail = timed_out_tts.json()["detail"]
+        assert timed_out_detail == "Voice is temporarily unavailable. Continue with the text shown above.", timed_out_detail
     finally:
+        config.TTS_TIMEOUT_SECONDS = locals().get("original_tts_timeout", config.TTS_TIMEOUT_SECONDS)
         audio_routes.synthesize_speech = original_synthesize_speech
 
     start = client.post(
@@ -493,7 +518,10 @@ def main() -> None:
         },
     )
     assert answer1.status_code == 200, answer1.text
-    session = answer1.json()["session"]
+    answer1_payload = answer1.json()
+    assert isinstance(answer1_payload["llm_duration_ms"], int), answer1_payload
+    assert isinstance(answer1_payload["total_duration_ms"], int), answer1_payload
+    session = answer1_payload["session"]
     assert session["phase"] == "part1"
 
     answer2 = client.post(

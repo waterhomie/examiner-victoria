@@ -1,3 +1,5 @@
+export const VOICE_UNAVAILABLE_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above.";
+
 export function friendlyError(err, fallback) {
   const message = err?.message || "";
   if (/secure HTTPS|secure context|local network HTTP|isSecureContext/i.test(message)) {
@@ -17,6 +19,9 @@ export function friendlyError(err, fallback) {
   }
   if (/transcription|audio|whisper|duration/i.test(message)) {
     return "Audio transcription is temporarily unavailable. You can switch to Text and type your answer.";
+  }
+  if (/tts|voice playback|voice is temporarily unavailable|voice unavailable/i.test(message)) {
+    return VOICE_UNAVAILABLE_MESSAGE;
   }
   if (/not reachable|VITE_API_BASE|backend service/i.test(message)) {
     return "Victoria's server is not reachable. Please try again in a moment, or check whether the backend is running.";

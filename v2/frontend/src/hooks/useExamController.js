@@ -198,6 +198,8 @@ export function useExamController({
           answerDuration: duration || 0,
           phase: answerPhase,
           messageCount: session.messages?.length || 0,
+          llm_duration_ms: data.llm_duration_ms || null,
+          total_duration_ms: Date.now() - answerStartedAt,
         });
         dispatch(answerSucceeded(data.session));
         if (data.start_prep_timer) {

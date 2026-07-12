@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api", tags=["audio"])
 TRANSCRIPTION_FAILURE_MESSAGE = (
     "Audio transcription is temporarily unavailable. Please switch to Text or try again."
 )
-TTS_FAILURE_MESSAGE = "Voice playback is temporarily unavailable. You can continue with text."
+TTS_USER_FALLBACK_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above."
 
 
 @router.post("/transcribe", response_model=TranscriptionResponse)
@@ -65,16 +65,16 @@ async def transcribe(
         raise HTTPException(status_code=502, detail=TRANSCRIPTION_FAILURE_MESSAGE) from last_error
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
     logger.info(
-        "Audio transcription completed: size=%s mime=%s elapsed_ms=%s",
+        "Audio transcription completed: size=%s mime=%s stt_duration_ms=%s",
         len(audio_bytes),
         mime_type,
         elapsed_ms,
     )
-    return TranscriptionResponse(text=text, elapsed_ms=elapsed_ms)
+    return TranscriptionResponse(text=text, elapsed_ms=elapsed_ms, stt_duration_ms=elapsed_ms)
 
 
 @router.post("/tts")
-def tts(request_body: TTSRequest, request: Request) -> Response:
+async def tts(request_body: TTSRequest, request: Request) -> Response:
     enforce_rate_limit(request)
     text = request_body.text.strip()
     if not text:
@@ -84,8 +84,38 @@ def tts(request_body: TTSRequest, request: Request) -> Response:
             status_code=413,
             detail="Voice playback text is too long. Please continue with the visible text.",
         )
+    started_at = time.perf_counter()
     try:
-        audio = synthesize_speech(text)
+        audio = await asyncio.wait_for(
+            asyncio.to_thread(synthesize_speech, text),
+            timeout=config.TTS_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as error:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.warning(
+            "TTS synthesis timed out: tts_duration_ms=%s chars=%s",
+            elapsed_ms,
+            len(text),
+        )
+        raise HTTPException(status_code=504, detail=TTS_USER_FALLBACK_MESSAGE) from error
     except Exception as error:
-        raise HTTPException(status_code=502, detail=TTS_FAILURE_MESSAGE) from error
-    return Response(content=audio, media_type="audio/mpeg")
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.warning(
+            "TTS synthesis failed: tts_duration_ms=%s chars=%s error_type=%s",
+            elapsed_ms,
+            len(text),
+            type(error).__name__,
+        )
+        raise HTTPException(status_code=502, detail=TTS_USER_FALLBACK_MESSAGE) from error
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    logger.info(
+        "TTS synthesis completed: tts_duration_ms=%s chars=%s bytes=%s",
+        elapsed_ms,
+        len(text),
+        len(audio),
+    )
+    return Response(
+        content=audio,
+        media_type="audio/mpeg",
+        headers={"X-TTS-Duration-Ms": str(elapsed_ms)},
+    )

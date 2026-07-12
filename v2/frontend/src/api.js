@@ -1,5 +1,7 @@
 const API_BASE = import.meta.env?.VITE_API_BASE || "";
 const DEFAULT_TIMEOUT_MS = 30000;
+export const TTS_TIMEOUT_MS = 12000;
+const TTS_TIMEOUT_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above.";
 
 function telemetryUrl() {
   return `${API_BASE}/api/telemetry`;
@@ -15,7 +17,7 @@ function audioFilenameForBlob(blob) {
 }
 
 async function request(path, options = {}) {
-  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options;
+  const { timeoutMessage, timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
   let response;
@@ -31,7 +33,7 @@ async function request(path, options = {}) {
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error("Request timed out. Victoria's server may be waking up; please try again.");
+      throw new Error(timeoutMessage || "Request timed out. Victoria's server may be waking up; please try again.");
     }
     throw new Error("Victoria's server is not reachable. Please check the backend service and VITE_API_BASE.");
   } finally {
@@ -102,6 +104,8 @@ export async function synthesizeSpeech(text) {
   const response = await request("/api/tts", {
     method: "POST",
     body: JSON.stringify({ text }),
+    timeoutMs: TTS_TIMEOUT_MS,
+    timeoutMessage: TTS_TIMEOUT_MESSAGE,
   });
   return response.blob();
 }

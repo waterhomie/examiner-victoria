@@ -101,6 +101,8 @@ class AnswerResponse(BaseModel):
     assistant_message: ChatMessage
     spoken_text: str
     start_prep_timer: bool = False
+    llm_duration_ms: int | None = None
+    total_duration_ms: int | None = None
 
 
 class ReportRequest(BaseModel):
@@ -114,6 +116,7 @@ class ReportResponse(BaseModel):
 class TranscriptionResponse(BaseModel):
     text: str
     elapsed_ms: int | None = None
+    stt_duration_ms: int | None = None
 
 
 class TTSRequest(BaseModel):
