@@ -346,11 +346,18 @@ def restore_tts_config(originals: dict[str, object]) -> None:
     audio_services.TTS_CACHE.clear()
 
 
-def install_fake_tencent_sdk(*, fail: bool = False) -> dict[str, object | None]:
+def install_fake_tencent_sdk(
+    *,
+    sdk_error_code: str | None = None,
+    error_message: str = "mock Tencent SDK failure",
+    raised_error: Exception | None = None,
+) -> dict[str, object | None]:
     module_names = [
         "tencentcloud",
         "tencentcloud.common",
         "tencentcloud.common.credential",
+        "tencentcloud.common.exception",
+        "tencentcloud.common.exception.tencent_cloud_sdk_exception",
         "tencentcloud.tts",
         "tencentcloud.tts.v20190823",
         "tencentcloud.tts.v20190823.models",
@@ -361,10 +368,28 @@ def install_fake_tencent_sdk(*, fail: bool = False) -> dict[str, object | None]:
     tencentcloud_mod = types.ModuleType("tencentcloud")
     common_mod = types.ModuleType("tencentcloud.common")
     credential_mod = types.ModuleType("tencentcloud.common.credential")
+    exception_mod = types.ModuleType("tencentcloud.common.exception")
+    sdk_exception_mod = types.ModuleType("tencentcloud.common.exception.tencent_cloud_sdk_exception")
     tts_mod = types.ModuleType("tencentcloud.tts")
     version_mod = types.ModuleType("tencentcloud.tts.v20190823")
     models_mod = types.ModuleType("tencentcloud.tts.v20190823.models")
     client_mod = types.ModuleType("tencentcloud.tts.v20190823.tts_client")
+
+    class FakeTencentCloudSDKException(Exception):
+        def __init__(self, code: str, message: str, request_id: str) -> None:
+            super().__init__(message)
+            self.code = code
+            self.message = message
+            self.requestId = request_id
+
+        def get_code(self) -> str:
+            return self.code
+
+        def get_message(self) -> str:
+            return self.message
+
+        def get_request_id(self) -> str:
+            return self.requestId
 
     class FakeCredential:
         def __init__(self, secret_id: str, secret_key: str) -> None:
@@ -379,37 +404,69 @@ def install_fake_tencent_sdk(*, fail: bool = False) -> dict[str, object | None]:
             assert region == "ap-shanghai"
 
         def TextToVoice(self, request: object) -> object:
-            assert request.Text == "Hello Victoria"
+            assert request.Text
             assert request.PrimaryLanguage == 2
-            assert request.VoiceType == 101001
+            assert request.ModelType == 1
+            assert request.VoiceType == 501009
             assert request.Codec == "mp3"
             assert request.SampleRate == 16000
             assert request.Speed == 0
             assert request.Volume == 0
             assert request.SessionId
-            if fail:
-                raise RuntimeError("mock sdk failure with hidden details")
+            if raised_error is not None:
+                raise raised_error
+            if sdk_error_code is not None:
+                raise FakeTencentCloudSDKException(
+                    sdk_error_code,
+                    error_message,
+                    "mock-error-request-id",
+                )
             return types.SimpleNamespace(
                 Audio=base64.b64encode(b"mock-mp3-audio").decode("ascii"),
                 RequestId="mock-request-id",
             )
 
     credential_mod.Credential = FakeCredential
+    sdk_exception_mod.TencentCloudSDKException = FakeTencentCloudSDKException
     models_mod.TextToVoiceRequest = FakeTextToVoiceRequest
     client_mod.TtsClient = FakeTtsClient
     common_mod.credential = credential_mod
+    common_mod.exception = exception_mod
+    exception_mod.tencent_cloud_sdk_exception = sdk_exception_mod
     version_mod.models = models_mod
     version_mod.tts_client = client_mod
     sys.modules.update({
         "tencentcloud": tencentcloud_mod,
         "tencentcloud.common": common_mod,
         "tencentcloud.common.credential": credential_mod,
+        "tencentcloud.common.exception": exception_mod,
+        "tencentcloud.common.exception.tencent_cloud_sdk_exception": sdk_exception_mod,
         "tencentcloud.tts": tts_mod,
         "tencentcloud.tts.v20190823": version_mod,
         "tencentcloud.tts.v20190823.models": models_mod,
         "tencentcloud.tts.v20190823.tts_client": client_mod,
     })
     return originals
+
+
+def capture_tts_logs(client: TestClient, *, text: str, session_id: str) -> tuple[object, str]:
+    import io
+    import logging
+
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    audio_routes.logger.addHandler(handler)
+    previous_level = audio_routes.logger.level
+    audio_routes.logger.setLevel(logging.INFO)
+    try:
+        response = client.post(
+            "/api/tts",
+            json={"text": text, "session_id": session_id},
+        )
+    finally:
+        audio_routes.logger.removeHandler(handler)
+        audio_routes.logger.setLevel(previous_level)
+    return response, stream.getvalue()
 
 
 def restore_fake_tencent_sdk(originals: dict[str, object | None]) -> None:
@@ -596,6 +653,11 @@ def main() -> None:
         "tts_enabled",
         "tts_provider",
         "tts_configured",
+        "tts_region",
+        "tts_voice_type",
+        "tts_codec",
+        "tts_sample_rate",
+        "tts_model_type",
         "tts_max_concurrency",
         "tts_rate_limit_per_minute",
         "server_timestamp",
@@ -610,6 +672,11 @@ def main() -> None:
     assert "base_url" not in diagnostics_payload, diagnostics_payload
     assert diagnostics_payload["tts_provider"] in {"disabled", "gtts", "tencent"}, diagnostics_payload
     assert isinstance(diagnostics_payload["tts_configured"], bool), diagnostics_payload
+    assert diagnostics_payload["tts_region"] == "ap-shanghai", diagnostics_payload
+    assert diagnostics_payload["tts_voice_type"] in {"unknown", str(config.TENCENT_TTS_VOICE_TYPE).strip()}, diagnostics_payload
+    assert diagnostics_payload["tts_codec"] == "mp3", diagnostics_payload
+    assert diagnostics_payload["tts_sample_rate"] == config.TENCENT_TTS_SAMPLE_RATE, diagnostics_payload
+    assert diagnostics_payload["tts_model_type"] == 1, diagnostics_payload
     assert diagnostics_payload["tts_max_concurrency"] == config.TTS_MAX_CONCURRENCY, diagnostics_payload
     assert diagnostics_payload["tts_rate_limit_per_minute"] == config.TTS_RATE_LIMIT_PER_MINUTE, diagnostics_payload
     assert "secret" not in str(diagnostics_payload).lower(), diagnostics_payload
@@ -770,9 +837,30 @@ def main() -> None:
         assert audio_services.tts_provider_is_configured() is False
         missing_voice_tts = client.post("/api/tts", json={"text": "Hello"})
         assert missing_voice_tts.status_code == 502, missing_voice_tts.text
-
+        config.TENCENTCLOUD_SECRET_ID = "mock-secret-id"
         config.TENCENTCLOUD_SECRET_KEY = "mock-secret-key"
-        config.TENCENT_TTS_VOICE_TYPE = "101001"
+        config.TENCENT_TTS_REGION = "ap-shanghai"
+        config.TENCENT_TTS_VOICE_TYPE = "501009"
+        config.TENCENT_TTS_CODEC = "mp3"
+        invalid_tencent_values = (
+            ("TENCENTCLOUD_SECRET_ID", "mock-secret-id\nunsafe"),
+            ("TENCENTCLOUD_SECRET_KEY", "mock-secret-key\nunsafe"),
+            ("TENCENT_TTS_REGION", "ap-shanghai/unsafe"),
+            ("TENCENT_TTS_VOICE_TYPE", "501009x"),
+            ("TENCENT_TTS_CODEC", "mp3;unsafe"),
+        )
+        for config_name, invalid_value in invalid_tencent_values:
+            original_value = getattr(config, config_name)
+            setattr(config, config_name, invalid_value)
+            assert audio_services.tts_provider_is_configured() is False, config_name
+            setattr(config, config_name, original_value)
+
+
+        config.TENCENTCLOUD_SECRET_ID = "  mock-secret-id  "
+        config.TENCENTCLOUD_SECRET_KEY = "  mock-secret-key  "
+        config.TENCENT_TTS_REGION = "  ap-shanghai  "
+        config.TENCENT_TTS_VOICE_TYPE = "  501009  "
+        config.TENCENT_TTS_CODEC = "  MP3  "
         fake_sdk = install_fake_tencent_sdk()
         try:
             tencent_tts = client.post("/api/tts", json={"text": "Hello Victoria"})
@@ -782,16 +870,112 @@ def main() -> None:
         finally:
             restore_fake_tencent_sdk(fake_sdk)
 
-        audio_services.TTS_CACHE.clear()
-        fake_sdk = install_fake_tencent_sdk(fail=True)
-        try:
-            failed_tencent_tts = client.post("/api/tts", json={"text": "Hello Victoria"})
-            assert failed_tencent_tts.status_code == 502, failed_tencent_tts.text
-            failed_tts_detail = failed_tencent_tts.json()["detail"]
-            assert "mock sdk failure" not in failed_tts_detail, failed_tts_detail
-            assert failed_tts_detail == "Voice is temporarily unavailable. Continue with the text shown above.", failed_tts_detail
-        finally:
-            restore_fake_tencent_sdk(fake_sdk)
+        diagnostic_tts_fields = client.get("/api/diagnostics/runtime").json()
+        assert {
+            "tts_region": "ap-shanghai",
+            "tts_voice_type": "501009",
+            "tts_codec": "mp3",
+            "tts_sample_rate": 16000,
+            "tts_model_type": 1,
+        }.items() <= diagnostic_tts_fields.items(), diagnostic_tts_fields
+        assert "mock-secret-id" not in str(diagnostic_tts_fields), diagnostic_tts_fields
+        assert "mock-secret-key" not in str(diagnostic_tts_fields), diagnostic_tts_fields
+
+        sdk_error_codes = [
+            "ClientNetworkError",
+            "AuthFailure",
+            "UnauthorizedOperation",
+            "InvalidParameterValue.VoiceType",
+            "NoFreeAccount",
+            "PkgExhausted",
+        ]
+        for index, error_code in enumerate(sdk_error_codes):
+            audio_services.TTS_CACHE.clear()
+            sensitive_text = f"Sensitive user text {index}"
+            fake_sdk = install_fake_tencent_sdk(
+                sdk_error_code=error_code,
+                error_message=(
+                    f"Safe Tencent message for {sensitive_text}, "
+                    "SecretId=mock-secret-id, SecretKey=mock-secret-key, "
+                    "Authorization=Bearer mock-authorization, "
+                    "Audio=QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=, "
+                    + ("Z" * 400)
+                ),
+            )
+            try:
+                failed_tencent_tts, tts_logs = capture_tts_logs(
+                    client,
+                    text=sensitive_text,
+                    session_id=f"sdk-error-{index}",
+                )
+                assert failed_tencent_tts.status_code == 502, failed_tencent_tts.text
+                assert failed_tencent_tts.json()["detail"] == (
+                    "Voice is temporarily unavailable. Continue with the text shown above."
+                ), failed_tencent_tts.text
+                assert f"error_code={error_code}" in tts_logs, tts_logs
+                logged_message = tts_logs.split("error_message=", 1)[1].split(" request_id=", 1)[0]
+                assert len(logged_message) <= audio_services.TTS_ERROR_MESSAGE_LIMIT, logged_message
+                assert "Z" * 241 not in logged_message, logged_message
+                assert "request_id=mock-error-request-id" in tts_logs, tts_logs
+                assert "provider=tencent" in tts_logs, tts_logs
+                assert "voice_type=501009" in tts_logs, tts_logs
+                assert "region=ap-shanghai" in tts_logs, tts_logs
+                assert "codec=mp3" in tts_logs, tts_logs
+                assert "sample_rate=16000" in tts_logs, tts_logs
+                for forbidden_value in (
+                    "mock-secret-id",
+                    "SecretId",
+                    "SecretKey",
+                    "Authorization",
+                    "mock-secret-key",
+                    "mock-authorization",
+                    sensitive_text,
+                    "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=",
+                ):
+                    assert forbidden_value not in tts_logs, tts_logs
+            finally:
+                restore_fake_tencent_sdk(fake_sdk)
+
+        for index, raised_error in enumerate(
+            (
+                ConnectionError("SecretKey=mock-secret-key network failure"),
+                RuntimeError("SecretId=mock-secret-id unknown failure"),
+            )
+        ):
+            audio_services.TTS_CACHE.clear()
+            fake_sdk = install_fake_tencent_sdk(raised_error=raised_error)
+            try:
+                failed_tencent_tts, tts_logs = capture_tts_logs(
+                    client,
+                    text=f"Non-SDK failure text {index}",
+                    session_id=f"non-sdk-error-{index}",
+                )
+                assert failed_tencent_tts.status_code == 502, failed_tencent_tts.text
+                expected_code = "TTS_NETWORK_ERROR" if isinstance(raised_error, ConnectionError) else "TTS_UNKNOWN_ERROR"
+                assert f"error_code={expected_code}" in tts_logs, tts_logs
+                assert "mock-secret-id" not in tts_logs, tts_logs
+                assert "mock-secret-key" not in tts_logs, tts_logs
+                assert failed_tencent_tts.json()["detail"] == (
+                    "Voice is temporarily unavailable. Continue with the text shown above."
+                ), failed_tencent_tts.text
+            finally:
+                restore_fake_tencent_sdk(fake_sdk)
+
+        text_flow_session = start_api_session(
+            client,
+            practice_type="part3",
+            cue_card_title=chosen_card,
+            voice_playback_enabled=True,
+        )
+        text_flow_payload = answer_api(
+            client,
+            text_flow_session,
+            "I think this matters because it affects people's everyday choices.",
+        )
+        assert text_flow_payload["assistant_message"]["content"], text_flow_payload
+        assert text_flow_payload["session"]["candidate_answers"], text_flow_payload
+        assert text_flow_payload["session"]["current_question"], text_flow_payload
+
 
         def slow_synthesize_speech(_text: str) -> audio_services.TTSResult:
             import time

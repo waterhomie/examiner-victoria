@@ -142,6 +142,11 @@ class RuntimeDiagnosticsResponse(BaseModel):
     tts_enabled: bool
     tts_provider: str
     tts_configured: bool
+    tts_region: str
+    tts_voice_type: str
+    tts_codec: str
+    tts_sample_rate: int
+    tts_model_type: int
     tts_max_concurrency: int
     tts_rate_limit_per_minute: int
     server_timestamp: str

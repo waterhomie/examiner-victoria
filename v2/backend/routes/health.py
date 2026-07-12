@@ -5,7 +5,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter
 
 from ..core import config
-from ..audio_services import normalize_tts_provider_name, tts_provider_is_configured
+from ..audio_services import (
+    get_tencent_tts_public_diagnostics,
+    normalize_tts_provider_name,
+    tts_provider_is_configured,
+)
 from ..engine import get_practice_options, get_question_bank_summary
 from ..schemas import RuntimeDiagnosticsResponse
 
@@ -36,6 +40,7 @@ def runtime_diagnostics() -> RuntimeDiagnosticsResponse:
         "tts_enabled": tts_provider_is_configured(),
         "tts_provider": normalize_tts_provider_name(),
         "tts_configured": tts_provider_is_configured(),
+        **get_tencent_tts_public_diagnostics(),
         "tts_max_concurrency": config.TTS_MAX_CONCURRENCY,
         "tts_rate_limit_per_minute": config.TTS_RATE_LIMIT_PER_MINUTE,
         "server_timestamp": datetime.now(timezone.utc).isoformat(),

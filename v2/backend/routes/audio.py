@@ -11,6 +11,12 @@ from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from ..core import config
+from ..audio_services import (
+    TTSProviderError,
+    get_safe_tts_error_log_fields,
+    get_tencent_tts_public_diagnostics,
+    normalize_tts_provider_name,
+)
 from ..core.rate_limit import enforce_rate_limit
 from ..engine import synthesize_speech, transcribe_audio
 from ..schemas import TTSRequest, TranscriptionResponse
@@ -31,6 +37,24 @@ TRANSCRIPTION_FAILURE_MESSAGE = (
     "Audio transcription is temporarily unavailable. Please switch to Text or try again."
 )
 TTS_USER_FALLBACK_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above."
+
+
+def _log_tts_failure(error: Exception, duration_ms: int) -> None:
+    error_fields = get_safe_tts_error_log_fields(error)
+    tts_fields = get_tencent_tts_public_diagnostics()
+    logger.warning(
+        "TTS synthesis failed: error_code=%s error_message=%s request_id=%s "
+        "provider=%s tts_duration_ms=%s voice_type=%s region=%s codec=%s sample_rate=%s",
+        error_fields["error_code"],
+        error_fields["error_message"],
+        error_fields["request_id"],
+        normalize_tts_provider_name(),
+        duration_ms,
+        tts_fields["tts_voice_type"],
+        tts_fields["tts_region"],
+        tts_fields["tts_codec"],
+        tts_fields["tts_sample_rate"],
+    )
 
 
 def _reset_tts_admission_state_for_tests() -> None:
@@ -174,13 +198,11 @@ async def tts(request_body: TTSRequest, request: Request) -> Response:
     global_semaphore, session_semaphore, admission_reason = await _acquire_tts_admission(session_key)
     if session_semaphore is None or global_semaphore is None:
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-        logger.warning(
-            "TTS admission rejected: reason=%s provider=%s tts_duration_ms=%s chars=%s",
-            admission_reason,
-            config.TTS_PROVIDER,
-            elapsed_ms,
-            len(text),
+        admission_error = TTSProviderError(
+            "TTS admission rejected",
+            error_code=f"TTS_ADMISSION_{admission_reason.upper()}",
         )
+        _log_tts_failure(admission_error, elapsed_ms)
         status_code = 429 if admission_reason in {"rate_limited", "session_busy"} else 503
         raise HTTPException(status_code=status_code, detail=TTS_USER_FALLBACK_MESSAGE)
 
@@ -196,31 +218,28 @@ async def tts(request_body: TTSRequest, request: Request) -> Response:
         result = await asyncio.wait_for(future, timeout=config.TTS_TIMEOUT_SECONDS)
     except TimeoutError as error:
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-        logger.warning(
-            "TTS synthesis timed out: provider=%s tts_duration_ms=%s chars=%s",
-            config.TTS_PROVIDER,
-            elapsed_ms,
-            len(text),
+        timeout_error = TTSProviderError(
+            "TTS request timed out",
+            error_code="TTS_TIMEOUT",
         )
+        _log_tts_failure(timeout_error, elapsed_ms)
         raise HTTPException(status_code=504, detail=TTS_USER_FALLBACK_MESSAGE) from error
     except Exception as error:
         elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-        logger.warning(
-            "TTS synthesis failed: provider=%s tts_duration_ms=%s chars=%s error_type=%s",
-            config.TTS_PROVIDER,
-            elapsed_ms,
-            len(text),
-            type(error).__name__,
-        )
+        _log_tts_failure(error, elapsed_ms)
         raise HTTPException(status_code=502, detail=TTS_USER_FALLBACK_MESSAGE) from error
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    tts_fields = get_tencent_tts_public_diagnostics()
     logger.info(
-        "TTS synthesis completed: provider=%s tts_duration_ms=%s chars=%s bytes=%s request_id=%s",
+        "TTS synthesis completed: provider=%s tts_duration_ms=%s request_id=%s "
+        "voice_type=%s region=%s codec=%s sample_rate=%s",
         result.provider,
         elapsed_ms,
-        len(text),
-        len(result.audio),
         result.request_id or "",
+        tts_fields["tts_voice_type"],
+        tts_fields["tts_region"],
+        tts_fields["tts_codec"],
+        tts_fields["tts_sample_rate"],
     )
     return Response(
         content=result.audio,
