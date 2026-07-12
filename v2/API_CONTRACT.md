@@ -31,29 +31,13 @@ Response:
 ```json
 {
   "status": "ok",
-  "app": "examiner-victoria-v2",
-  "config": {
-    "api_key_configured": true,
-    "base_url": "https://api.gptsapi.net/v1",
-    "model": "gpt-5.4-mini",
-    "transcription_model": "whisper-1",
-    "admin_token_configured": true,
-    "telemetry_max_events": 500
-  },
-  "limits": {
-    "max_audio_upload_mb": 12,
-    "rate_limit_per_minute": 120,
-    "max_answer_chars": 4000,
-    "max_session_messages": 120,
-    "max_tts_chars": 1200
-  },
-  "cors_origins": ["https://your-frontend-domain.com"]
+  "app": "examiner-victoria-v2"
 }
 ```
 
-`api_key_configured` is a boolean only; the backend never returns the actual API key.
-`admin_token_configured` is also a boolean only; the backend never returns the
-actual admin token.
+This public health endpoint intentionally does not return provider settings,
+model names, CORS origins, runtime limits, environment variables, or secrets.
+Use `GET /api/diagnostics/runtime` for detailed non-sensitive runtime checks.
 
 ## GET /api/question-bank
 

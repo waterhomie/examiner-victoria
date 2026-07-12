@@ -293,10 +293,15 @@ def main() -> None:
     health = client.get("/api/health")
     assert health.status_code == 200, health.text
     health_payload = health.json()
-    assert health_payload["config"]["model"], health_payload
-    assert "api_key_configured" in health_payload["config"], health_payload
-    assert health_payload["limits"]["max_audio_upload_mb"] >= 1, health_payload
-    assert health_payload["cors_origins"], health_payload
+    assert health_payload == {
+        "status": "ok",
+        "app": "examiner-victoria-v2",
+    }, health_payload
+    assert "config" not in health_payload, health_payload
+    assert "limits" not in health_payload, health_payload
+    assert "cors_origins" not in health_payload, health_payload
+    assert "base_url" not in str(health_payload).lower(), health_payload
+    assert "model" not in str(health_payload).lower(), health_payload
 
 
     runtime_diagnostics = client.get("/api/diagnostics/runtime")

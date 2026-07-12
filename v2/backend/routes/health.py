@@ -16,9 +16,6 @@ def health() -> dict[str, object]:
     return {
         "status": "ok",
         "app": "examiner-victoria-v2",
-        "config": config.get_runtime_config_summary(),
-        "limits": config.get_runtime_limits_summary(),
-        "cors_origins": config.get_cors_origins(),
     }
 
 
