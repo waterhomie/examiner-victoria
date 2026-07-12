@@ -717,3 +717,31 @@ iOS 风险集中在：
 - 不修改 Prompt、题库、Railway 配置或 V2 canonical worktree。
 
 完成该任务后，再进入国内入口部署验证；入口稳定后，再逐个评估 LLM、STT、TTS provider 替换。
+
+## 附录：国内访问实测更新｜2026-07-12
+
+详见：[V3 Beta 国内首次访问测试记录](V3_BETA_ACCESS_TEST_LOG.md)。
+
+本轮对 V3 Beta Railway 公网地址 `https://examiner-victoria-v2-v3-beta.up.railway.app` 进行了国内无 VPN 首次访问小样本测试。结果如下：
+
+- 无 VPN Wi-Fi：0/5 成功，5/5 失败，页面均未进入 System check。
+- 4G/5G 补充测试：Android 手机关闭 Wi-Fi、关闭 VPN 后仍失败，浏览器提示网络连接不稳定。
+- VPN 对照：相同或同类设备开启 VPN 后可以打开页面、进入 System check，API 显示 reachable。
+
+事实边界：本轮样本只能说明在本轮小样本实测中，Railway 公网地址未满足国内无 VPN 公测所需的稳定可达性；不能外推为全国性统计结论，也不能证明所有运营商或地区均无法访问。
+
+当前产品结论：Railway 当前不满足国内无 VPN 公测入口要求。Railway 保留为海外版本、技术基线和回滚环境；下一阶段进入国内访问入口选型与迁移。
+
+当前决策：
+
+1. 停止继续扩大 Railway 国内访问样本。
+2. 不再把优化 Railway 国内可达性作为主要方向。
+3. 保留 V2 Production Railway 环境。
+4. 保留 V3 Beta Railway 环境作为海外测试与回滚基线。
+5. 下一阶段选择国内无 VPN 可访问的部署入口。
+6. 继续保留 React + FastAPI。
+7. 暂不同时更换 LLM、STT、TTS。
+8. 暂不开发账号、数据库、支付、小程序。
+9. 国内公测仍以 5-20 人、月成本不超过 100 元为约束。
+
+本次实测结果不触发 React 产品流程修改，也不触发入口、LLM、STT、TTS 的同步迁移。下一阶段应先验证国内 H5 入口、静态资源与基础 API 可达性，再逐步验证完整练习链路。
