@@ -1,4 +1,6 @@
-﻿# Examiner Victoria V3 Beta 国内首次访问测试记录
+# Examiner Victoria V3 Beta 国内首次访问测试记录
+
+> **Historical access-test evidence.** This log records the earlier Railway beta access test and remains useful as a point-in-time observation. It is not the current deployment guide; see [V3 Current Status](V3_CURRENT_STATUS.md).
 
 ## 1. 测试目的
 

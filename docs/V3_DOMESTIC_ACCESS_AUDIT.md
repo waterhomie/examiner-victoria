@@ -1,4 +1,6 @@
-﻿# Examiner Victoria V3 国内可访问性审计与迁移规划
+# Examiner Victoria V3 国内可访问性审计与迁移规划
+
+> **Historical migration audit.** This document preserves the pre-CloudBase risk assessment, including earlier Railway and gTTS assumptions. The migration has since advanced; use [V3 Current Status](V3_CURRENT_STATUS.md) for current deployment and provider facts.
 
 > 本文档基于 V3 kickoff、V2 README/API/架构文档，以及当前 React + FastAPI 代码实现进行审计。本文只做访问链路、风险和迁移规划分析，不代表已经完成供应商、备案、价格或平台政策的官方核验。
 

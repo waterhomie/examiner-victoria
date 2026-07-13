@@ -1,187 +1,88 @@
-﻿# Examiner Victoria V2
+# Examiner Victoria
 
-Examiner Victoria V2 is a React + FastAPI IELTS speaking coach that runs as a
-single web service: FastAPI serves the React app and the `/api` routes.
+> **V3 Beta | AI IELTS Speaking Coach**
 
-## Current Status
+Examiner Victoria is a mobile-friendly IELTS Speaking practice application. It combines structured Practice and Mock flows with recording, transcription, AI feedback, spoken examiner prompts, reports, and lightweight anonymous feedback.
 
-V2 is the current production version and the only main development version.
-It is deployed on Railway from this repository root. The V1 Streamlit app is a
-frozen historical prototype kept only for reference and emergency comparison.
+## Current status
 
-This project was product-led and implemented with AI coding agents. The work
-focuses on user-flow design, prompt and interaction rules, structured question
-data, testing, deployment, and the delivery of a working AI product prototype.
+V3 Beta is the active product line and is in small-scale invitation testing. Five anonymous testers (T001–T005) have completed the first round, producing feedback records F001–F016. The next step is targeted follow-up validation; this is not yet a broad public release or a claim of market validation.
 
-## Online Links
+- Current integration branch: `v3/domestic-public-beta`
+- Domestic beta: [Open Examiner Victoria V3 Beta](https://examiner-victoria-v3-beta-281197-7-1330057446.sh.run.tcloudbase.com)
+- Health check: [`/api/health`](https://examiner-victoria-v3-beta-281197-7-1330057446.sh.run.tcloudbase.com/api/health)
+- Current-state reference: [V3 Current Status](docs/V3_CURRENT_STATUS.md)
+- Source repository: [waterhomie/examiner-victoria-v2](https://github.com/waterhomie/examiner-victoria-v2)
+- Frozen V2 Railway reference: [Examiner Victoria V2](https://examiner-victoria-v2-production.up.railway.app)
 
-- Production app: https://examiner-victoria-v2-production.up.railway.app
-- Health check: https://examiner-victoria-v2-production.up.railway.app/api/health
-- GitHub repository: https://github.com/waterhomie/examiner-victoria-v2
+The repository name is retained for compatibility. A rename to `examiner-victoria` is planned only after V3 is promoted to `main` and the CloudBase deployment is verified from `main`.
 
-## V1 to V2
+## What V3 Beta includes
 
-- V1: Python + Streamlit prototype. Frozen. No new features.
-- V2: React frontend + FastAPI backend. Current production version.
+- Practice and Mock modes
+- IELTS Speaking Part 1, Part 2, Part 3, and Full flows
+- voice-first Mock experience
+- direct-topic Part 1 practice
+- browser recording and server-side transcription
+- AI examiner questions and feedback
+- Tencent Cloud TTS on the CloudBase deployment
+- text fallback when TTS is unavailable
+- reports, transcripts, practice records, export, and download
+- runtime diagnostics and a user-facing System check
+- mobile H5 support and anonymous tester feedback
 
-New product work belongs in V2. V1 should not be changed unless a documented
-historical-reference or security reason requires it.
+## Architecture
 
-## Tech Stack
+The current application keeps the proven V2 shape:
 
-- Frontend: React 19, Vite, pnpm
-- Backend: FastAPI, Pydantic, OpenAI-compatible provider client
-- Speech: browser recording, server transcription fallback, gTTS-based TTS
-- Deployment: Dockerfile-based Railway single service
-- Tests: question-bank validation, backend smoke test, frontend smoke test,
-  production build, deployment config check
+- React 19 + Vite + pnpm frontend
+- FastAPI + Pydantic backend
+- a single Docker container
+- FastAPI serves both the built frontend and `/api`
+- frontend-held sessions passed through API requests
+- no account system or application database
 
-## Core Features
+The active application remains in the legacy-compatible `v2/` directory. Imports, Docker paths, scripts, and tests depend on that location, so the directory is not being renamed during the V3 beta transition.
 
-- IELTS Speaking Part 1, Part 2, Part 3, Full, Practice, and Mock flows
-- Practice Mode keeps the full chat, transcript, immediate correction, expression coaching, and natural-answer upgrade.
-- Mock Mode is voice-first: it hides the main chat stream and real-time transcript during the test, keeps Part 2 Cue Card support, and reserves feedback for the final report.
-- Part 3 uses a question-bank backbone with answer-driven follow-up and question-bank fallback, without a fixed dynamic-question ratio.
-- Mobile-first chat interface with fixed composer
-- Text answers and tap-to-record voice answers
-- Transcription and AI feedback
-- Victoria voice playback with mobile autoplay fallbacks
-- Practice feedback, reports, transcript export, and practice record export
-- In-memory telemetry summary for performance debugging without storing answer text
+## Deployment and providers
 
-## Repository Structure
+CloudBase Run in Shanghai is the current domestic V3 Beta entry. Verified scope includes iPhone Wi-Fi, iPhone 4G, Safari, the WeChat embedded browser, HTTPS, microphone recording, local playback, and the transcribe/answer/TTS API chain with VPN disabled.
 
-```text
-.
-|-- AGENTS.md
-|-- README.md
-|-- Dockerfile
-|-- railway.json
-|-- render.yaml
-|-- question_bank.py
-|-- pdf_recall_question_bank.py
-|-- validate_question_bank.py
-|-- deploy/
-|   `-- vps/
-|-- docs/
-|   `-- DEVELOPMENT_WORKFLOW.md
-`-- v2/
-    |-- backend/
-    |-- frontend/
-    |-- scripts/
-    |-- API_CONTRACT.md
-    |-- DEPLOYMENT.md
-    |-- RUN_LOCAL.md
-    `-- README.md
-```
+Railway is retained as historical deployment evidence and rollback context:
 
-## Local Run
+- the V2 Railway deployment represents the frozen V2 baseline
+- the V3 Railway beta was an overseas test baseline
+- Railway is not the current domestic V3 entry
 
-From the repository root:
+Provider positioning:
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\run_local_stack.ps1 -BackendPort 8010 -FrontendPort 5174 -SkipInstall
-```
+- LLM: existing OpenAI-compatible provider
+- STT: existing server transcription path, with browser capability checks and fallback behavior
+- TTS: Tencent Cloud TextToVoice through the official Python SDK on CloudBase
+- gTTS: explicit local/legacy provider only
+- voice degradation: written feedback and the next question remain available if TTS fails
 
-Open:
+## Product boundaries
 
-```text
-http://127.0.0.1:5174
-http://127.0.0.1:5174/api/health
-```
+V3 Beta intentionally does not add accounts, cross-device identity, a persistent application database, payment, a WeChat Mini Program rewrite, full-duplex voice, acoustic pronunciation scoring, long-term learner profiles, or persistent personalized answer histories.
 
-Stop the local stack:
+## Version history
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\stop_local_stack.ps1
-```
+| Version | Status | Reference |
+| --- | --- | --- |
+| V1 | Historical prototype | Repository history |
+| V2 | Frozen stable baseline | `main`, tag `v2.0.0`, commit `d592900` |
+| V3 Beta | Active invitation-testing line | `v3/domestic-public-beta`, CloudBase Run |
 
-## Tests
+## Documentation
 
-Run the main deterministic check:
+- [V3 Current Status](docs/V3_CURRENT_STATUS.md) — authoritative current state
+- [User Feedback Log](docs/USER_FEEDBACK_LOG.md) — tester evidence and decisions
+- [V3 Beta Constraints](docs/V3_BETA_CONSTRAINTS.md) — active scope and cost boundaries
+- [Runtime Dependencies](docs/V3_RUNTIME_DEPENDENCIES.md) — provider and environment-variable contract
+- [Runtime Diagnostics](docs/V3_RUNTIME_DIAGNOSTICS.md) — non-sensitive diagnostics contract
+- [Manual Test Checklist](docs/V3_MANUAL_TEST_CHECKLIST.md) — manual acceptance coverage
+- [Development Workflow](docs/DEVELOPMENT_WORKFLOW.md) — branch, release, and rollback workflow
+- [AGENTS.md](AGENTS.md) — project-level AI collaboration rules
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_v2.ps1 -SkipInstall
-```
-
-Run deployment config checks:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deploy_config.ps1
-```
-
-These checks must not call real LLM, STT, TTS, or production telemetry services.
-
-## Deployment
-
-Railway builds from the repository root using:
-
-```text
-Dockerfile
-railway.json
-```
-
-`railway.json` uses Dockerfile builder and `/api/health` as the health check.
-Railway Root Directory should be the repository root. If Railway exposes a
-Config File Path setting, it should point to `/railway.json`.
-
-See [v2/DEPLOYMENT.md](v2/DEPLOYMENT.md) for deployment details.
-
-## Environment Variables
-
-Set real secrets only in local ignored `.env` files or hosting-provider
-variable dashboards. Do not commit real values.
-
-Backend variables include:
-
-```text
-API_KEY
-BASE_URL
-MODEL
-TRANSCRIPTION_MODEL
-CORS_ORIGINS
-MAX_AUDIO_UPLOAD_MB
-RATE_LIMIT_PER_MINUTE
-MAX_ANSWER_CHARS
-MAX_SESSION_MESSAGES
-MAX_TTS_CHARS
-TTS_CACHE_MAX_ITEMS
-ADMIN_TOKEN
-TELEMETRY_MAX_EVENTS
-```
-
-Frontend examples are documented in `v2/frontend/.env.example`. Any `VITE_*`
-value can be exposed to the browser, so do not put secrets there.
-
-## Git Development Flow
-
-All changes must follow:
-
-```text
-branch -> test -> commit -> push -> PR -> merge
-```
-
-Do not commit directly on `main`. Do not use the old `tmp/github-sync-*` copy
-workflow for new development. See
-[docs/DEVELOPMENT_WORKFLOW.md](docs/DEVELOPMENT_WORKFLOW.md).
-
-## Security and Privacy
-
-- Never commit real `.env` files.
-- Never commit private feedback data, user names, user answers, audio, logs, or
-  generated telemetry exports.
-- Keep API keys server-side.
-- Do not paste secrets into chat, screenshots, or GitHub issues.
-- Build artifacts such as `node_modules`, `dist`, caches, and `tmp` are not
-  source files.
-
-## Product Boundaries
-
-Current V2 is a working IELTS speaking coach prototype. It does not yet include:
-
-- user accounts
-- database-backed practice history
-- payments or subscriptions
-- WeChat Mini Program release
-- formal acoustic pronunciation scoring
-- human tutor marketplace features
+Older migration, audit, and access-test documents remain in the repository as historical evidence. Use [V3 Current Status](docs/V3_CURRENT_STATUS.md) when an older planning statement conflicts with the present release state.

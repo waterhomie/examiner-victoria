@@ -1,137 +1,88 @@
-﻿# Development Workflow
+# Examiner Victoria development workflow
 
-This document defines the safe maintenance workflow for Examiner Victoria V2.
+> Current transition workflow for Examiner Victoria V3 Beta. See [V3 Current Status](V3_CURRENT_STATUS.md) for the authoritative release state.
 
-## Canonical Directory
+## Current branch model
 
-Always operate from the root of the currently opened Git repository.
+During the V3 Beta transition:
 
-On the primary Windows development machine, the canonical local path is:
+- `v3/domestic-public-beta` is the integration branch
+- new task branches start from `v3/domestic-public-beta`
+- task PRs target `v3/domestic-public-beta`
+- `main` remains the frozen V2 release line
+- `v2.0.0` at `d592900e29c0cdcc4576d884c178991deea7013c` remains the V2 baseline
+- CloudBase is expected to build the V3 integration branch until promotion is explicitly approved
 
-```text
-D:\Software\Codex\Projects\examiner-victoria-v2-canonical
-```
+This is a temporary release-transition model, not permanent parallel development.
 
-The old workspace and old `tmp/github-sync-*` directories are historical
-evidence and should not be used for new feature work.
+## Normal task lifecycle
 
-## Branches
+1. Confirm the repository, branch, remote, and clean worktree.
+2. Fast-forward the current integration branch.
+3. Create a narrowly named task branch.
+4. Inspect current code and documentation before making assumptions.
+5. Change only the authorized scope.
+6. Run focused validation and inspect the final diff.
+7. Commit with an intentional message.
+8. Push the task branch.
+9. Open a PR to `v3/domestic-public-beta`.
+10. Leave merge and deployment to an explicitly approved step.
+11. After merge, sync the integration branch and remove the merged task branch when authorized.
 
-`main` is the production branch connected to Railway. Do not commit directly on
-`main`.
+Do not mix unrelated UI, provider, deployment, and documentation changes into one PR.
 
-Use feature or maintenance branches:
+## V3 promotion sequence
 
-```text
-feature/<short-name>
-fix/<short-name>
-maintenance/<short-name>
-docs/<short-name>
-```
+Promotion to the permanent release line is a separate, human-reviewed operation:
 
-## Standard Flow
+1. complete V3 consolidation on `v3/domestic-public-beta`
+2. merge all approved task PRs into the V3 branch
+3. run final code, documentation, mobile, provider, and deployment checks
+4. open a final promotion PR from `v3/domestic-public-beta` to `main`
+5. review and merge the promotion PR only with explicit approval
+6. change the CloudBase source branch to `main`
+7. deploy and verify the exact main-based build
+8. create tag `v3.0.0-beta.1`
+9. rename the GitHub repository to `examiner-victoria`, if still desired
+10. update Git remotes and public documentation links
+11. delete the V3 integration branch only after confirmation and rollback review
 
-```text
-check status -> create branch -> edit -> test -> commit -> push branch -> PR -> merge
-```
+A task PR must not silently perform any later step in this sequence.
 
-Before editing:
+## Deployment workflow
 
-```powershell
-git status --short --branch
-git branch --show-current
-git rev-parse HEAD
-git remote -v
-```
+CloudBase Run in Shanghai is the current domestic beta entry. Its source-branch selection and deployment remain human-controlled. Before any deployment task:
 
-## Tests
+- verify the expected commit and source branch
+- review `Dockerfile`, `v2/DEPLOYMENT.md`, and current V3 deployment documentation
+- use build-version diagnostics when configured
+- keep secrets in the CloudBase secret/configuration store
+- verify `/api/health`, `/api/diagnostics/runtime`, the frontend, and the intended user flow
+- record only non-sensitive deployment evidence
 
-Use deterministic local checks before commit:
+Railway instructions are retained for V2 rollback history and the V3 overseas test baseline. They are not the default domestic V3 workflow.
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_v2.ps1 -SkipInstall
-```
+## Rollback policy
 
-For deployment configuration:
+Prefer reversible operations:
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deploy_config.ps1
-```
+- use CloudBase version or traffic rollback for a bad CloudBase deployment
+- revert a faulty Git commit or PR instead of rewriting history
+- retain the `v2.0.0` tag and frozen V2 Railway deployment as historical recovery references
+- preserve the V3 integration branch until the main-based deployment is verified
+- never use force push, destructive reset, or history deletion as a routine rollback
 
-Do not run checks that call real LLM, STT, TTS, production telemetry, or paid
-providers unless the user explicitly asks for that test.
+Provider failure should degrade safely where supported. In particular, TTS failure must preserve written feedback and the next question.
 
-## Commit Rules
+## Documentation authority
 
-- Keep commits small and explainable.
-- Commit only files needed for the task.
-- Do not mix product changes, documentation cleanup, deployment changes, and
-  repository migration in one commit unless the task explicitly requires it.
-- Run `git diff --check` before commit.
+Use documents in this order for current decisions:
 
-## Push and PR
+1. root `README.md`
+2. `docs/V3_CURRENT_STATUS.md`
+3. `docs/USER_FEEDBACK_LOG.md`
+4. `AGENTS.md`
+5. this workflow
+6. specialized or historical V3 audit, migration, diagnostic, and test records
 
-Push only the current working branch. Do not force push unless the user has
-explicitly approved it.
-
-Open a PR for review. Do not auto-merge. Railway auto deploy follows `main`, so
-merging to `main` is a production-relevant action.
-
-## Railway
-
-Railway builds from repository root:
-
-```text
-Dockerfile
-railway.json
-```
-
-Expected settings:
-
-- Source Repo: `waterhomie/examiner-victoria-v2`
-- Production Branch: `main`
-- Root Directory: repository root / blank
-- Config File Path, if present: `/railway.json`
-
-Do not modify Railway settings without explicit user confirmation.
-
-## Rollback
-
-If a branch has not been merged, stop using it or delete the branch after
-confirming with the user.
-
-If a commit has been merged, prefer a normal revert commit or revert PR:
-
-```powershell
-git revert <commit-sha>
-```
-
-If production deploy fails, redeploy the previous known-good Railway deployment
-or revert the merge commit and redeploy.
-
-## Files That Must Not Enter Git
-
-- real `.env` files
-- API keys, admin tokens, GitHub tokens, provider secrets
-- private feedback data
-- real user names, user answers, or audio
-- logs, PIDs, tunnel URLs
-- `node_modules`
-- `dist`
-- caches and temporary files
-
-## V1 Policy
-
-V1 Streamlit is frozen. Do not add features to V1. Use it only as historical
-reference or for narrowly scoped security/recovery checks.
-
-## Large Changes
-
-Wait for explicit user confirmation before:
-
-- moving directories
-- changing deployment settings
-- changing API contracts
-- changing prompt or scoring behavior
-- changing question-bank content
-- introducing persistence, payments, accounts, or Mini Program work
+Historical documents remain valuable evidence, but their old deployment or provider assumptions must not override the current-status reference.

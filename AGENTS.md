@@ -1,99 +1,93 @@
-﻿# Codex Instructions for Examiner Victoria V2
+# Examiner Victoria project-level agent instructions
 
-These rules apply to AI coding agents working in this repository.
+## Repository context
 
-## Repository Boundary
+- Repository: `waterhomie/examiner-victoria-v2` (legacy-compatible name)
+- Active Windows V3 worktree: `D:\Software\Codex\Projects\examiner-victoria-v3`
+- Active integration branch: `v3/domestic-public-beta`
+- Frozen V2 release: `main`, tag `v2.0.0`, commit `d592900e29c0cdcc4576d884c178991deea7013c`
+- Authoritative current state: `docs/V3_CURRENT_STATUS.md`
 
-Always operate from the root of the currently opened Git repository.
+Older canonical or temporary worktree paths in historical documents are context only. Do not use them as the default location for new work.
 
-On the primary Windows development machine, the canonical local path is:
+## Product and directory status
 
-```text
-D:\Software\Codex\Projects\examiner-victoria-v2-canonical
-```
+Examiner Victoria V3 Beta is the current product line. The application still lives under `v2/` for compatibility: imports, Docker paths, scripts, and tests rely on that directory. Do not move or rename `v2/` during ordinary V3 tasks.
 
-Do not use old `tmp/github-sync-*` clones for new development. Do not modify old
-workspaces unless the user explicitly asks for a migration or audit step.
+V2 remains a frozen baseline. Preserve its tag, commit history, QA records, and rollback documentation.
 
-## Start Every Task
+## Branch discipline during the V3 transition
 
-Before making changes, inspect:
+Until a reviewed V3 promotion to `main` is complete:
 
-```powershell
-git status --short --branch
-git branch --show-current
-git rev-parse HEAD
-git remote -v
-```
+1. start task branches from `v3/domestic-public-beta`
+2. open task PRs with `v3/domestic-public-beta` as the base
+3. do not merge task branches directly to `main`
+4. do not delete the V3 integration branch
+5. do not rewrite V2 or V3 history
+6. do not create a V3 tag without explicit approval
 
-If the task affects deployment, also inspect `railway.json`, `Dockerfile`, and
-`v2/DEPLOYMENT.md`.
+After V3 is promoted, deployed from `main`, and verified, normal task branches may use `main` according to the updated workflow.
 
-## Branch Discipline
+## Safe change boundaries
 
-Do not commit directly on `main`. Create a task branch, test, commit, push the
-branch, and let the user decide PR/merge timing.
+Before editing:
 
-## Secret and Privacy Rules
+- inspect `git status --short --branch`
+- preserve unrelated user changes
+- do not read or print real `.env` values
+- do not expose keys, tokens, cookies, credentials, user recordings, full answers, or transcripts
+- use repository-local dependencies and existing scripts
+- keep Prompt, question bank, scoring, Practice/Mock rules, and provider behavior unchanged unless the task explicitly authorizes them
 
-- Do not read, print, copy, or commit real `.env` contents.
-- Do not commit API keys, admin tokens, GitHub tokens, provider keys, or private
-  feedback data.
-- Do not commit real user names, answers, transcripts, audio, telemetry dumps,
-  logs, or tunnel URLs.
-- Do not place secrets in frontend `VITE_*` variables.
+Never use `git reset --hard`, `git clean`, force push, or history rewriting to work around a dirty worktree.
 
-## Product Boundaries
+## Deployment awareness
 
-V2 is the current production and main development version. V1 Streamlit is a
-frozen historical prototype. Do not add V1 features.
+The current domestic beta runs on Tencent CloudBase Run:
 
-Do not change these without explicit user confirmation:
+- service: `examiner-victoria-v3-beta`
+- expected source branch during transition: `v3/domestic-public-beta`
+- container port: `8080`
+- health: `/api/health`
+- diagnostics: `/api/diagnostics/runtime`
 
-- prompts
-- question-bank content
-- IELTS state machine
-- STT/TTS behavior
-- report/scoring behavior
-- API contract
-- deployment settings
-- major UI interaction flows
+Before deployment-related work, inspect:
 
-## Testing
+- `Dockerfile`
+- `docs/V3_CURRENT_STATUS.md`
+- `docs/V3_CLOUDBASE_MIGRATION_PLAN.md`
+- `docs/V3_RUNTIME_DEPENDENCIES.md`
+- `v2/DEPLOYMENT.md`
+- the actual CloudBase source branch reported by the user
 
-Before commit, run the relevant deterministic checks. For most V2 changes:
+Do not assume Railway is the current domestic deployment. Railway V2 is a frozen historical/rollback reference, and Railway V3 is an overseas test baseline.
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_v2.ps1 -SkipInstall
-```
+Do not change CloudBase or Railway settings, trigger a deployment, or create cloud resources unless explicitly authorized.
 
-For deployment-only changes:
+## Required human confirmation
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deploy_config.ps1
-```
+Stop and request confirmation before:
 
-Do not call real LLM, STT, TTS, payment, telemetry-write, or production-mutating
-services unless the user explicitly asks for that test.
+- promoting V3 to `main` or merging the promotion PR
+- changing the CloudBase build source branch
+- creating a V3 release tag
+- renaming the GitHub repository or changing Git remotes
+- deleting `v3/domestic-public-beta`
+- moving or renaming `v2/`
+- deleting, moving, or substantially rewriting historical audit and test documents
+- adding accounts, databases, payment, a Mini Program, or other scope-expanding features
 
-## Commits
+## Validation and delivery
 
-Commit only intentional files. Keep commits small. Do not include:
+Use validation proportional to the change. For documentation work, at minimum:
 
-- `node_modules`
-- `dist`
-- `tmp`
-- caches
-- logs
-- generated local QA files with private data
+- inspect the complete diff and `git diff --stat`
+- run `git diff --check`
+- check changed Markdown links
+- scan changed files for accidental secrets and personal data
+- confirm that only intended files changed
 
-## Human Confirmation Required
+For code work, use the relevant compile, smoke, build, and focused regression tests documented by the repository.
 
-Stop and ask before:
-
-- merging to `main`
-- modifying Railway settings
-- pushing production-sensitive changes if tests failed
-- deleting or moving historical files
-- changing persistent data, user privacy, or deployment topology
-- starting Phase 3 or later migration work
+Create commits and PRs only when the user authorizes them. Never auto-merge unless the user explicitly asks for that exact action.

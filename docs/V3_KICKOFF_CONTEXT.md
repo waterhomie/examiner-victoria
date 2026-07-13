@@ -1,4 +1,6 @@
-﻿# Examiner Victoria V3｜Domestic Public Beta Kickoff Context
+# Examiner Victoria V3｜Domestic Public Beta Kickoff Context
+
+> **Historical snapshot.** This file records the V3 kickoff assumptions and may describe Railway or planned provider work as current. Use [V3 Current Status](V3_CURRENT_STATUS.md) for the authoritative release state; do not use this document alone for deployment decisions.
 
 ## 1. 项目定位
 

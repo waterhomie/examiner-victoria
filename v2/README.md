@@ -1,18 +1,17 @@
-# Examiner Victoria V2
+# Examiner Victoria application (`v2/` compatibility directory)
 
-V2 is the production React + FastAPI version of Examiner Victoria. It replaced
-the earlier Streamlit prototype as the main development line:
+> **Current status:** this legacy-named directory contains the active V3 Beta React + FastAPI application. It is not a frozen V2-only tree. Imports, Docker paths, tests, and scripts rely on `v2/`, so the directory will be retained until a separately reviewed compatibility migration.
+
+The architecture originated in V2 when Examiner Victoria moved from Streamlit to React + FastAPI. V3 Beta continues that proven shape:
 
 - React frontend for the iOS/WeChat-style chat experience.
-- Python FastAPI backend for IELTS test state, feedback, transcription, TTS, and reports.
-- Stateless API contract: the frontend sends the current `ExamSession`, and the backend
-  returns the updated session. This keeps deployment simple and avoids server-side session
-  loss across instances.
+- Python FastAPI backend for IELTS test state, feedback, transcription, TTS, diagnostics, and reports.
+- Stateless API contract: the frontend sends the current `ExamSession`, and the backend returns the updated session.
+- One Docker container in which FastAPI serves both the built frontend and `/api`.
 
-The original Streamlit app is now a frozen historical prototype. Keep it for
-reference only; new feature work should happen in V2.
+The frozen V2 release remains on `main`, tag `v2.0.0`, commit `d592900e29c0cdcc4576d884c178991deea7013c`. Current V3 work is integrated on `v3/domestic-public-beta`. See [V3 Current Status](../docs/V3_CURRENT_STATUS.md).
 
-## Why V2 exists
+## Why this architecture exists
 
 Streamlit is excellent for fast prototypes, but it reruns the whole script after each
 interaction. That makes it difficult to build a truly native chat interface with:
@@ -40,32 +39,34 @@ Related docs:
 
 Current recommendation:
 
-- Treat V2 as the production application and the only main development version.
-- Keep V1 Streamlit frozen as archive/reference material.
-- Use the repository root for deployment, documentation, and Git workflow.
+- Treat V3 Beta as the active product line and `v3/domestic-public-beta` as the transition integration branch.
+- Keep V2 frozen on `main` and tag `v2.0.0`.
+- Keep the `v2/` directory name until imports, Docker paths, tests, and scripts are intentionally migrated.
+- Use Tencent CloudBase Run as the current domestic beta entry; keep Railway as historical and rollback context.
 
 Ready now:
 
-- Local React/FastAPI development flow.
-- Stateless backend API for IELTS session state.
-- Question-bank validation, backend smoke tests, and frontend production build.
-- Custom chat UI, tap-to-record voice input, transcription, TTS playback, scoring reports,
-  practice-record export, focused practice modes, mobile chat scrolling, and
-  one-service Railway deployment from the repository root.
+- Local React/FastAPI development and one-container deployment.
+- Practice and Mock flows for Part 1, Part 2, Part 3, and Full sessions.
+- Direct-topic Part 1 practice and voice-first Mock behavior.
+- Browser recording, STT transcription, LLM feedback, Tencent Cloud TTS, and text fallback.
+- Reports, transcripts, practice-record export, runtime diagnostics, and System check.
+- Domestic H5 access verified on iPhone Wi-Fi, iPhone 4G, Safari, and WeChat embedded browser.
+- First invitation round completed with five anonymous testers.
 
-Still worth improving:
+Still worth validating:
 
-- User feedback and practice-history storage.
-- Production-grade authentication and user quotas before wider public use.
-- China-accessible deployment or WeChat Mini Program packaging for domestic testers.
-- Budget-aware rate-limit tuning for larger test groups.
+- targeted follow-up fixes and mobile regression coverage
+- Android, carrier, 5G, and concurrency behavior
+- provider latency, reliability, quotas, and observed monthly cost
+- production CORS and operational settings before wider sharing
 
-Intentionally not included yet:
+Intentionally not included:
 
-- User accounts or database-backed history.
-- Payment, subscription, or WeChat Mini Program release.
-- Formal acoustic pronunciation scoring.
-- Human tutor review or marketplace features.
+- accounts, database-backed history, or cross-device identity
+- payment, subscription, or WeChat Mini Program release
+- full-duplex voice or formal acoustic pronunciation scoring
+- long-term learner profiles or persistent personalized answer histories
 
 ## Directory structure
 
@@ -243,7 +244,7 @@ Frontend deployment variables are listed in:
 v2/frontend/.env.example
 ```
 
-## Current V2 capabilities
+## Current application capabilities
 
 - Starts a new IELTS speaking session.
 - Supports Full, Part 1, Part 2, and Part 3 focused practice modes.
@@ -279,11 +280,11 @@ v2/frontend/.env.example
 
 ## Future product work
 
-- Add proper authentication, quotas, and practice-history persistence.
-- Add a domestic feedback build or WeChat Mini Program path.
-- Add persistent practice history if user accounts become necessary.
-- Set production `CORS_ORIGINS` to the deployed public domain.
-
+- Continue targeted follow-up validation from the first five anonymous testers.
+- Improve CloudBase stability, provider latency visibility, and budget observation.
+- Expand Android, carrier, 5G, and concurrency coverage before wider sharing.
+- Consider accounts, persistent history, payment, or Mini Program work only after a separate product decision.
+- Set production `CORS_ORIGINS` to the deployed public domain when the rollout requires it.
 ## Verification already completed
 
 - Python compile check for the V2 backend modules.

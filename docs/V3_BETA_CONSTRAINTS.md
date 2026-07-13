@@ -1,56 +1,63 @@
-# Examiner Victoria V3 公测约束
+# Examiner Victoria V3 Beta constraints
 
-本文记录已经确认的 V3 国内 H5 公测边界。本文不记录真实 API Key、Token、Cookie、用户语音、用户回答或任何真实 `.env` 值。
+> Active scope boundary. Current release facts are maintained in [V3 Current Status](V3_CURRENT_STATUS.md).
 
-## 公测规模
+## Beta stage
 
-- 第一批测试用户为 5-20 人。
-- 本阶段属于小规模探索性公测，用于定位访问、录音、播放、STT、LLM、TTS 和报告链路问题。
-- 不宣称已经完成大规模用户验证。
+The first small invitation round is complete:
 
-## 成本边界
+- five anonymous testers: T001–T005
+- feedback records: F001–F016
+- original 3–5 person target reached
 
-- 服务器与 API 月总成本上限为 100 元人民币。
-- 后续需要按单次练习估算 STT、LLM、TTS、服务器和带宽摊销成本。
-- 未完成成本验证前，不开放无限制公共调用。
-- 公测前至少需要确认：单次录音时长上限、单文件大小上限、单次练习最大轮数、单设备或单 session 每日次数、API 超时、失败重试次数、STT/LLM/TTS 单次成本，以及月成本超过 100 元时的停止策略。
-- 本文不虚构供应商价格；价格、额度和政策必须以官方最新资料核验为准。
+The next stage is targeted follow-up validation of fixes, mobile behavior, latency, reliability, and cost. V3 Beta is not yet a broad public launch and the current evidence must not be described as market validation.
 
-## 终端与浏览器策略
+## Deployment boundary
 
-优先推荐：
+The domestic H5 path is already deployed on Tencent CloudBase Run in Shanghai. Basic access and the main voice chain have been verified on iPhone Wi-Fi, iPhone 4G, Safari, and the WeChat embedded browser with VPN disabled.
 
-1. Safari
-2. Chrome
-3. 微信内置浏览器尽量支持
+Current work should focus on stability, feedback, and controlled follow-up testing rather than reopening the domestic-entry architecture decision. CloudBase settings, deployment versions, and source branches remain human-controlled.
 
-微信策略：
+Do not generalize the completed checks to all Android devices, all carriers, 5G, or high concurrency.
 
-- 微信内置浏览器可以打开页面并查看系统检测。
-- 如果当前微信环境支持录音和播放，允许用户继续练习。
-- 如果微信环境不支持录音、播放或下载，应明确提示“请使用 Safari 或 Chrome 打开”。
-- 第一阶段不承诺在所有微信版本、所有 iOS/Android 机型中完成完整练习。
-- 不直接阻止微信用户继续，只提供能力检测和降级建议。
+## Provider boundary
 
-## Provider 策略
+- LLM and STT remain on the existing provider paths
+- CloudBase TTS uses Tencent Cloud TextToVoice through the provider adapter
+- gTTS is local/legacy only
+- written feedback and the next question remain available when TTS is disabled or fails
+- provider migration must be incremental and separately validated
 
-- 第一阶段保留当前 LLM provider。
-- 第一阶段保留当前 STT provider。
-- LLM 与 STT 后续逐个进行真实访问测试，不同时替换。
-- TTS 允许失败并降级为文字内容。
-- 不在文档、前端或诊断结果中记录真实 API Key。
-- 本轮不购买云服务，不迁移部署，不替换 provider。
+Do not replace multiple providers in one task. Do not record credentials in the repository.
 
-## 当前非目标
+## Cost boundary
 
-- 账号系统。
-- 数据库。
-- 支付。
-- 微信小程序。
-- 全双工语音。
-- 正式声学发音评分。
-- 大规模运营后台。
+The working beta budget remains **no more than RMB 100 per month** unless the user explicitly approves a change. Track actual CloudBase and provider consumption during invitation testing.
 
-## 本轮工作边界
+Do not invent vendor prices. Pricing, quotas, free allowances, filing rules, and platform policies must be verified against current official sources before a purchasing or architecture decision.
 
-本轮重点是定位问题和准备测试，不是解决所有国内访问问题。允许新增只读系统检测、非敏感后端诊断接口、运行时依赖文档和人工测试清单；不修改 Prompt、题库、Railway 配置、V2 canonical worktree 或真实 `.env`。
+Expansion beyond the current test group depends on feedback quality, reliability, privacy review, and observed cost.
+
+## Product non-goals
+
+Do not add these features as incidental V3 Beta work:
+
+- accounts or cross-device identity
+- a persistent application database
+- payments
+- a WeChat Mini Program rewrite
+- full-duplex real-time voice
+- acoustic pronunciation scoring
+- long-term learner profiles
+- persistent personal experiences
+- a personalized full-answer flow
+
+Any of these requires an explicit product decision, separate design, and separate privacy/cost review.
+
+## Safety and privacy
+
+- collect the minimum anonymous feedback needed for beta decisions
+- do not store or document user recordings, full answers, transcripts, or personal identifiers
+- keep API keys, tokens, credentials, cookies, and real environment values out of code and documentation
+- keep runtime diagnostics non-sensitive
+- do not let TTS failure clear transcript, feedback, next question, or session state

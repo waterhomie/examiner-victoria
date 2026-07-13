@@ -1,5 +1,7 @@
 # Examiner Victoria V3 CloudBase Run 国内入口迁移兼容性审计与实施计划
 
+> **Migration record with active reference material.** Planning sections below preserve the original pre-migration reasoning, while dated updates record completed CloudBase and Tencent TTS validation. For a concise authoritative snapshot, use [V3 Current Status](V3_CURRENT_STATUS.md).
+
 审计日期：2026-07-12
 状态更新日期：2026-07-13
 目标分支：`v3/domestic-public-beta`

@@ -1,30 +1,33 @@
-﻿# Examiner Victoria V2 Public Deployment
+# Examiner Victoria V3 Beta deployment
 
-This V2 deployment path is intentionally simple: deploy **one FastAPI web
-service** that serves both the React app and `/api`.
+> The active application remains in the legacy-compatible `v2/` directory. Current release facts are maintained in [V3 Current Status](../docs/V3_CURRENT_STATUS.md).
 
-This is the current production deployment shape. Do not split Netlify frontend
-and backend unless a later architecture task explicitly requires it; the
-phone-to-backend voice loop is easiest to debug as one HTTPS service.
+Examiner Victoria uses one Docker container: Vite builds the React frontend, FastAPI serves the resulting static files, and the same HTTPS origin exposes `/api`. This deployment shape is supported on CloudBase Run and remains compatible with Railway.
 
-## Current Railway deployment
+## Current deployment roles
 
-The GitHub repository root contains the deployable app. Railway should point at
-the repository root, use the production branch, and build the root Dockerfile.
-If Railway has a Config File Path setting, it should point to `/railway.json`.
+### CloudBase Run — current domestic V3 Beta entry
 
-Production currently uses Railway for the public V2 test build. Keep secrets in
-Railway environment variables only.
+- Region: Shanghai
+- Service: `examiner-victoria-v3-beta`
+- Expected transition source branch: `v3/domestic-public-beta`
+- Container port: `8080`
+- Public URL: <https://examiner-victoria-v3-beta-281197-7-1330057446.sh.run.tcloudbase.com>
+- Health: `/api/health`
+- Runtime diagnostics: `/api/diagnostics/runtime`
 
-## Other supported platforms
+CloudBase deployment and source-branch selection are human-controlled. Do not assume automatic deployment, switch branches, create resources, or publish a new version without explicit authorization.
 
-Use one of these managed web-service platforms:
+### Railway — historical and rollback context
 
-- Railway: current simple production path.
-- Render: also works well with the included Dockerfile.
-- Fly.io: good later if you are comfortable with a slightly more technical CLI.
+- The original V2 Railway service represents the frozen V2 baseline.
+- The V3 Railway beta was an overseas test baseline.
+- Railway is not the current domestic V3 entry.
+- Keep the Railway files and instructions below for reproducibility, rollback context, and overseas checks; do not treat them as the default V3 deployment path.
 
-The committed deployment files are:
+## Container contract
+
+The repository root contains the deployable files:
 
 ```text
 Dockerfile
@@ -34,108 +37,93 @@ render.yaml
 v2/scripts/check_deploy_config.ps1
 ```
 
-The Dockerfile builds `v2/frontend` with pnpm, copies the React `dist` into the
-Python image, installs `v2/backend/requirements.txt`, and starts:
+The root Dockerfile builds `v2/frontend` with pnpm, copies the React `dist` into the Python image, installs `v2/backend/requirements.txt`, and starts the FastAPI application. The hosting platform supplies `PORT`; CloudBase currently expects `8080`.
 
-```bash
-python -m uvicorn v2.backend.app:app --host 0.0.0.0 --port $PORT
-```
-
-FastAPI then serves:
+FastAPI serves:
 
 ```text
 https://your-public-domain/
 https://your-public-domain/api/health
+https://your-public-domain/api/diagnostics/runtime
 ```
 
-## Environment variables
+## CloudBase configuration
 
-Set these in the hosting provider's dashboard. Never put real secrets in GitHub
-or chat.
+Configure non-sensitive settings and secrets in the CloudBase console. Never commit real values or paste them into documentation.
+
+Core provider and safety variable names are documented in [V3 Runtime Dependencies](../docs/V3_RUNTIME_DEPENDENCIES.md). The Tencent TTS path uses names including:
 
 ```text
-API_KEY=<provider-api-key>
-BASE_URL=https://api.gptsapi.net/v1
-MODEL=gpt-5.4-mini
-TRANSCRIPTION_MODEL=whisper-1
-CORS_ORIGINS=*
-MAX_AUDIO_UPLOAD_MB=12
-RATE_LIMIT_PER_MINUTE=120
-MAX_ANSWER_CHARS=4000
-MAX_SESSION_MESSAGES=120
-MAX_TTS_CHARS=1200
-TTS_CACHE_MAX_ITEMS=64
-ADMIN_TOKEN=<long-random-admin-token>
-TELEMETRY_MAX_EVENTS=500
+TTS_PROVIDER
+TENCENTCLOUD_SECRET_ID
+TENCENTCLOUD_SECRET_KEY
+TENCENT_TTS_REGION
+TENCENT_TTS_VOICE_TYPE
+TENCENT_TTS_CODEC
+TENCENT_TTS_SAMPLE_RATE
+TENCENT_TTS_SPEED
+TENCENT_TTS_VOLUME
 ```
 
-To generate a strong `ADMIN_TOKEN` locally:
+The CloudBase deployment should use `TTS_PROVIDER=tencent`. Credential values belong only in the deployment secret store and should follow CAM least-privilege principles.
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\generate_admin_token.ps1
-```
-
-For the first one-service test, `CORS_ORIGINS=*` is acceptable because the
-frontend and backend are on the same domain. Before wider public sharing, replace
-it with the real public domain.
-
-## Railway path
-
-1. Connect Railway to `waterhomie/examiner-victoria-v2`.
-2. Use the production branch and repository root.
-3. Choose Dockerfile build if Railway asks for the builder.
-4. Add the environment variables above.
-5. Deploy and open the generated Railway domain.
-6. Test:
+Optional build identity uses:
 
 ```text
-https://your-railway-domain/api/health
-https://your-railway-domain/
+APP_GIT_SHA
+APP_BUILD_TIME
+APP_DEPLOY_TARGET
+APP_SOURCE_BRANCH
+APP_VERSION
 ```
 
-## Render path
+See [Build Version Diagnostics](../docs/V3_BUILD_VERSION_DIAGNOSTICS.md) for safe placeholder examples.
 
-1. Put this project into a private GitHub repository.
-2. In Render, create a new Blueprint or Web Service from the repository.
-3. Use `render.yaml` or choose Docker manually.
-4. Add `API_KEY` as a secret value if Render does not import it automatically.
-5. Deploy and open the generated Render domain.
+Other backend settings include the existing LLM/STT provider variables, CORS, upload limits, answer/session limits, rate limits, TTS limits, and telemetry protection. Refer to the runtime dependency document and environment examples for names; do not copy real environment values into Git.
 
-## Local deployment-config check
+## Provider behavior
 
-Run this before pushing to a hosting provider:
+- LLM uses the existing OpenAI-compatible provider adapter.
+- STT uses the existing server transcription path.
+- TTS on CloudBase uses Tencent Cloud TextToVoice through the official Python SDK and project adapter.
+- gTTS is an explicit local/legacy option only.
+- If TTS is unconfigured, times out, or fails, written feedback and the next question remain available.
+- Runtime logs and diagnostics must not contain credentials, complete environment dumps, recordings, full user answers, or transcripts.
+
+## CloudBase release checklist
+
+Before a human-triggered deployment:
+
+1. Confirm the intended Git commit and source branch.
+2. Review the root `Dockerfile` and deployment diff.
+3. Confirm required variable names are present in the CloudBase configuration without exposing values.
+4. Set non-sensitive build identity fields for the intended build.
+5. Deploy from the selected source branch.
+6. Verify the exact deployed build with runtime diagnostics.
+7. Check the frontend, `/api/health`, and `/api/diagnostics/runtime`.
+8. Run one controlled manual flow only when provider calls are explicitly authorized.
+9. Record non-sensitive results and observed timing/cost.
+10. Retain the previous CloudBase version for rollback.
+
+## Local deployment checks
+
+Run the repository deployment check before a hosting change:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deploy_config.ps1
 ```
 
-If this folder is not a valid Git repository yet, create a clean deployment zip
-first:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\prepare_public_deploy_bundle.ps1
-```
-
-The zip is written to:
-
-```text
-tmp/examiner-victoria-v2-deploy-bundle.zip
-```
-
-Use that zip as the source for a new private GitHub repository, or keep it as a
-sanitized handoff package. It excludes `.env`, `node_modules`, local build
-outputs, and temporary logs.
-
-If Docker Desktop is installed and running, you can also build the production
-image locally:
+If Docker Desktop is available:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deploy_config.ps1 -BuildDockerImage
 ```
 
+The local full-stack preview is documented in [RUN_LOCAL.md](RUN_LOCAL.md).
+
 ## Public smoke check
 
-For this one-service deployment, use the same URL for backend and frontend:
+For the one-service architecture, use the same origin for frontend and backend:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deployed_v2.ps1 `
@@ -143,65 +131,28 @@ powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deployed_v2.ps1 
   -FrontendUrl "https://your-public-domain"
 ```
 
-This checks health, API-key presence, CORS, question-bank counts, practice
-options, telemetry summary protection, a core session/answer API flow, and
-frontend HTML.
+Despite the compatibility name, this helper validates the current one-service application. Use protected/admin checks only with explicit authorization, and never print the token.
 
-To also verify the protected telemetry summary payload, pass your private admin
-token:
+The expected read-only checks include the homepage, health, safe diagnostics, CORS behavior, question-bank metadata, and frontend HTML. Do not run paid-provider flows unless the task explicitly permits them.
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\check_deployed_v2.ps1 `
-  -BackendUrl "https://your-public-domain" `
-  -FrontendUrl "https://your-public-domain" `
-  -AdminToken "your-admin-token"
-```
+## Railway historical path
 
-Legacy note: before the repository root was cleaned up, deployment used a
-temporary GitHub sync helper. Do not use that helper for normal development now;
-push normal branches and let Railway build from the repository root.
+For reproducing the historical Railway shape:
 
-If you ever need to inspect the legacy helper, use the dry-run first:
+1. Connect Railway to the repository root.
+2. Select the intended historical or rollback branch explicitly.
+3. Build the root Dockerfile or use `railway.json`.
+4. configure variables in the Railway dashboard without committing values.
+5. deploy and verify the generated HTTPS domain.
+6. check the homepage, `/api/health`, and safe diagnostics.
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\sync_public_deploy_github.ps1
-```
+The committed Railway configuration is retained, but ordinary V3 domestic deployment work should not modify Railway.
 
-Only push after the dry-run looks right:
+## Other compatible hosting paths
 
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\v2\scripts\sync_public_deploy_github.ps1 -Push
-```
+The Docker image can also run on Render, Fly.io, or the prepared VPS setup. Those are compatibility options, not the current V3 Beta release target.
 
-## Phone test order
-
-Use this exact order so slow parts are easy to identify:
-
-1. Desktop browser: open the public URL and send one typed answer.
-2. iPhone Safari: open the public HTTPS URL.
-3. Turn Victoria sound off first.
-4. Record a short answer for 3-4 seconds.
-5. Confirm the transcription appears and Victoria responds in text.
-6. Turn Victoria sound on and test the tap-to-play fallback.
-7. If the public version is still slow, inspect `window.__victoriaLastTranscription`
-   from a remote Safari console and compare `serverElapsedMs` with `serverTotalMs`.
-
-## Why not Netlify-only
-
-Netlify is good for a static React/Vite frontend, but this project needs a live
-FastAPI backend for transcription, GPTsAPI feedback, TTS, rate limits, and secret
-API keys. Deploying only the frontend would still leave the important voice loop
-dependent on another backend.
-
-After this one-service public test proves the mobile loop, a later production
-setup can split frontend/backend or move to a Hong Kong/Singapore VPS with Docker
-and Caddy automatic HTTPS.
-
-## Phase 2: Hong Kong/Singapore VPS
-
-If Railway/Render proves the product works but the China-facing mobile latency is
-still not good enough, move the same app image to a Hong Kong or Singapore VPS.
-The prepared files are:
+VPS support files remain under:
 
 ```text
 deploy/vps/docker-compose.yml
@@ -210,14 +161,28 @@ deploy/vps/.env.example
 deploy/vps/README.md
 ```
 
-On the VPS, copy `.env.example` to `.env`, fill in your domain, email, and
-backend secrets, then run:
+Before using another platform, review domestic accessibility, HTTPS, filing and domain requirements, provider egress, privacy, cost, and rollback using current official sources.
 
-```bash
-cd deploy/vps
-docker compose up -d --build
-```
+## Phone verification order
 
-Caddy will request and renew HTTPS certificates automatically for `DOMAIN`.
-The app still uses the same root Dockerfile, so Railway/Render and VPS deploy
-the same product build.
+Use the maintained [V3 Manual Test Checklist](../docs/V3_MANUAL_TEST_CHECKLIST.md). A minimal controlled sequence is:
+
+1. Open the HTTPS page and run System check.
+2. Confirm secure context, storage, microphone availability, recording, and local playback.
+3. Test written interaction without provider calls when possible.
+4. With explicit authorization, record one short answer and confirm transcription.
+5. Confirm written feedback and the next question remain visible.
+6. Test TTS playback from a user gesture on iOS or WeChat.
+7. Confirm a TTS failure degrades to text without a cold-start error.
+8. Recheck health and non-sensitive runtime diagnostics.
+
+Do not generalize a successful iPhone or WeChat check to all Android devices, carriers, 5G networks, or concurrency levels.
+
+## Rollback
+
+- CloudBase: select a previously verified version or traffic target through the console.
+- Git: revert the faulty change; do not rewrite history.
+- V2 baseline: preserve `main`, tag `v2.0.0`, and the frozen V2 Railway service.
+- V3 transition: keep `v3/domestic-public-beta` until the main-based deployment is verified.
+
+A repository rename, remote change, V3 tag, or CloudBase source-branch switch is part of the explicit promotion workflow, not a routine deployment step.
