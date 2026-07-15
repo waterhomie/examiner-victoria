@@ -40,6 +40,18 @@ function installWindow() {
   };
 }
 
+function assertProductMetadata() {
+  const indexHtml = readFileSync("./index.html", "utf8");
+  const manifestSource = readFileSync("./public/manifest.webmanifest", "utf8");
+  const manifest = JSON.parse(manifestSource);
+
+  assert.match(indexHtml, /<title>Examiner Victoria<\/title>/);
+  assert.doesNotMatch(indexHtml, /<title>Examiner Victoria V2<\/title>/);
+  assert.equal(manifest.name, "Examiner Victoria");
+  assert.equal(manifest.short_name, "Victoria");
+  assert.doesNotMatch(manifestSource, /Examiner Victoria V2|Examiner Victoria V3(?: Beta)?/);
+}
+
 function createSession(overrides = {}) {
   return {
     messages: [],
@@ -400,6 +412,7 @@ function assertChatBottomAnchorContracts() {
 
 await assertApiErrorMapping();
 await assertTtsFailureMapping();
+assertProductMetadata();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
 assertMockModeSelectors();
