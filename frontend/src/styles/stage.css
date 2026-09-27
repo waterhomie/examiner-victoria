@@ -89,6 +89,10 @@
   background: rgba(255, 255, 255, 0.58);
 }
 
+.stage-card > .topic-select:first-child {
+  margin-top: 0;
+}
+
 .topic-select span {
   flex: 0 0 auto;
   color: var(--muted);

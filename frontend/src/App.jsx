@@ -235,20 +235,15 @@ export default function App() {
           busy={state.busy}
           changeCueCardTitle={controller.changeCueCardTitle}
           changePart1Topic={controller.changePart1Topic}
-          currentPhase={currentPhase}
           formatDuration={formatDuration}
           hasStageControls={sessionView.hasVisibleStageControls}
-          isPracticeMode={sessionView.isPracticeMode}
           practiceOptions={state.practiceOptions}
           prepRemaining={sessionView.prepRemaining}
           recording={recording}
           selectedCueCardTitle={state.selectedCueCardTitle}
           selectedPart1Topic={state.selectedPart1Topic}
-          session={state.session}
-          sessionStats={sessionView.sessionStats}
           showCueCardSelect={sessionView.showCueCardSelect}
           showPart1TopicSelect={sessionView.showPart1TopicSelect}
-          stageDescription={sessionView.stageDescription}
           stageProgress={sessionView.stageProgress}
         />
       ) : null}

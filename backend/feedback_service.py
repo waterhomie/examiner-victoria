@@ -128,7 +128,8 @@ Answer: {answer}
                     ),
                 },
                 {"role": "user", "content": prompt},
-            ]
+            ],
+            operation="feedback",
         )
     except Exception:
         return None, None, None, False

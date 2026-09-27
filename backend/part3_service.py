@@ -140,7 +140,8 @@ Task:
                         "content": "You are a concise IELTS examiner. Return one question only.",
                     },
                     {"role": "user", "content": prompt},
-                ]
+                ],
+                operation="part3_followup",
             )
         )
     except Exception:

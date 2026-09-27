@@ -72,7 +72,8 @@ def rephrase_question(question: str) -> str:
                         "content": "Rephrase the IELTS question in simpler natural English.",
                     },
                     {"role": "user", "content": question},
-                ]
+                ],
+                operation="question_rephrase",
             )
         )
     except Exception:
