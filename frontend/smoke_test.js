@@ -48,6 +48,7 @@ function assertProductMetadata() {
   const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
   const downloadsSource = readFileSync("./src/utils/downloads.js", "utf8");
   const appConfigSource = readFileSync("./src/config/appConfig.js", "utf8");
+  const stageCardSource = readFileSync("./src/components/layout/ExamStageCard.jsx", "utf8");
 
   assert.match(indexHtml, /<title>Examiner Victoria<\/title>/);
   assert.doesNotMatch(indexHtml, /<title>Examiner Victoria V2<\/title>/);
@@ -59,6 +60,7 @@ function assertProductMetadata() {
   assert.doesNotMatch(downloadsSource, /Examiner Victoria V2/);
   assert.match(appConfigSource, /examiner-victoria-v2-state/);
   assert.doesNotMatch(manifestSource, /Examiner Victoria V2|Examiner Victoria V3(?: Beta)?/);
+  assert.doesNotMatch(stageCardSource, /stage-pill|training-pill|Current practice summary/);
 }
 
 function createSession(overrides = {}) {
@@ -153,13 +155,27 @@ function assertStageCardSelector() {
       candidate_answers: [{ phase: "identity", answer: "My name is Water." }],
     }),
   };
-  assert.equal(selectSessionView(state).shouldShowStageCard, false);
+  assert.equal(selectSessionView(state).shouldShowStageCard, true);
 
   state = {
     ...state,
     session: createSession({
       phase: "part1",
       candidate_answers: [{ phase: "part1", answer: "I study architecture." }],
+    }),
+  };
+  assert.equal(selectSessionView(state).shouldShowStageCard, true);
+
+  state = appReducer(
+    createInitialAppState(),
+    practiceOptionsLoaded({ part1_topics: [], cue_cards: [{ title: "a useful skill" }] }),
+  );
+  state = {
+    ...state,
+    practiceType: "part3",
+    session: createSession({
+      phase: "part3",
+      candidate_answers: [{ phase: "part3", answer: "It helps people at work." }],
     }),
   };
   assert.equal(selectSessionView(state).shouldShowStageCard, false);

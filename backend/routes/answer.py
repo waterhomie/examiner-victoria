@@ -12,7 +12,7 @@ from ..schemas import AnswerRequest, AnswerResponse
 
 
 router = APIRouter(prefix="/api", tags=["answer"])
-logger = logging.getLogger("examiner_victoria")
+logger = logging.getLogger("uvicorn.error")
 INVALID_ANSWER_MESSAGE = "No clear answer was detected. Please answer in words or try recording again."
 
 
@@ -38,10 +38,9 @@ def answer_question(request_body: AnswerRequest, request: Request) -> AnswerResp
     )
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
     logger.info(
-        "Answer processed: phase=%s source=%s llm_duration_ms=%s total_duration_ms=%s messages=%s",
+        "Answer processed: phase=%s source=%s answer_stage_duration_ms=%s messages=%s",
         request_body.session.phase,
         request_body.source,
-        elapsed_ms,
         elapsed_ms,
         len(session.messages),
     )

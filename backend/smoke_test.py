@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 import backend.core.config as config
 import backend.core.rate_limit as rate_limit
+import backend.ai_provider as ai_provider
 import backend.audio_services as audio_services
 import backend.exam_flow_service as exam_flow_service
 import backend.feedback_service as feedback_service
@@ -67,6 +68,41 @@ def deterministic_call_model(messages: list[dict[str, str]], *_args, **_kwargs) 
     if "Final IELTS Speaking Report" in joined or "IELTS Speaking test report" in joined:
         return DETERMINISTIC_REPORT
     return "How might this topic change in the future?"
+
+
+def assert_llm_timing_logs_are_safe() -> None:
+    import io
+    import logging
+
+    sensitive_marker = "private learner answer"
+    fake_response = types.SimpleNamespace(
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="NONE"))]
+    )
+    fake_completions = types.SimpleNamespace(create=lambda **_kwargs: fake_response)
+    fake_client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(completions=fake_completions)
+    )
+    original_get_client = ai_provider.get_client
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    previous_level = ai_provider.logger.level
+    ai_provider.logger.addHandler(handler)
+    ai_provider.logger.setLevel(logging.INFO)
+    ai_provider.get_client = lambda: fake_client
+    try:
+        result = ai_provider.call_model(
+            [{"role": "user", "content": sensitive_marker}],
+            operation="feedback",
+        )
+    finally:
+        ai_provider.get_client = original_get_client
+        ai_provider.logger.removeHandler(handler)
+        ai_provider.logger.setLevel(previous_level)
+
+    log_output = stream.getvalue()
+    assert result == "NONE", result
+    assert "LLM call completed: operation=feedback duration_ms=" in log_output, log_output
+    assert sensitive_marker not in log_output, log_output
 
 
 def install_deterministic_ai_stubs() -> dict[str, object]:
@@ -859,6 +895,7 @@ def main() -> None:
     assert question_bank_summary["part2_total_cards"] == 73, question_bank_summary
     assert question_bank_summary["part3_reference_questions"] == 383, question_bank_summary
     assert app.title == "Examiner Victoria API", app.title
+    assert_llm_timing_logs_are_safe()
     client = TestClient(app)
     originals = install_deterministic_ai_stubs()
 

@@ -2,44 +2,21 @@ export function ExamStageCard({
   busy,
   changeCueCardTitle,
   changePart1Topic,
-  currentPhase,
   formatDuration,
   hasStageControls,
-  isPracticeMode,
   practiceOptions,
   prepRemaining,
   recording,
   selectedCueCardTitle,
   selectedPart1Topic,
-  session,
-  sessionStats,
   showCueCardSelect,
   showPart1TopicSelect,
-  stageDescription,
   stageProgress,
 }) {
   const controlsDisabled = Boolean(busy) || recording;
 
   return (
     <aside className={`stage-card ${hasStageControls ? "has-stage-controls" : ""}`}>
-      <div className="stage-main">
-        <div className="stage-copy">
-          <div className="stage-line">
-            <span className="stage-pill">{currentPhase}</span>
-            <span className={`training-pill ${isPracticeMode ? "practice" : "mock"}`}>
-              {isPracticeMode ? "Practice" : "Mock"}
-            </span>
-          </div>
-          <p>{session?.phase === "part3" ? "Dynamic follow-up loop" : stageDescription}</p>
-        </div>
-        {session ? (
-          <div className="session-mini" aria-label="Current practice summary">
-            <span><strong>{sessionStats.answered}</strong> answers</span>
-            <span><strong>{sessionStats.averageWpm}</strong> WPM</span>
-            <span><strong>{sessionStats.totalDuration}</strong></span>
-          </div>
-        ) : null}
-      </div>
       {prepRemaining > 0 ? (
         <div className="prep-timer" aria-live="polite">
           Part 2 prep time <strong>{formatDuration(prepRemaining)}</strong>

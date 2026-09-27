@@ -237,7 +237,8 @@ Raw answer log:
                     "content": "You are a strict but helpful IELTS Speaking examiner.",
                 },
                 {"role": "user", "content": prompt},
-            ]
+            ],
+            operation="report",
         )
         return f"{model_report.strip()}\n\n---\n\n{build_session_learning_summary(session)}"
     except Exception:

@@ -91,7 +91,9 @@ export function selectSessionView(state) {
     mockExam: selectMockExamView(state),
     prepRemaining,
     sessionStats,
-    shouldShowStageCard: hasVisibleStageControls && (prepRemaining > 0 || !stageSelectionIsSettled),
+    shouldShowStageCard:
+      hasVisibleStageControls &&
+      (prepRemaining > 0 || showPart1TopicSelect || !stageSelectionIsSettled),
     showCueCardSelect,
     showPart1TopicSelect,
     stageDescription: getStageDescription(isPracticeMode),
