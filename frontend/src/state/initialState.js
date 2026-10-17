@@ -9,6 +9,7 @@ export function createInitialAppState() {
     report: "",
     audioEnabled: true,
     trainingMode: "practice",
+    feedbackAdaptation: "standard",
     practiceType: "full",
     practiceOptions: { part1_topics: [], cue_cards: [] },
     selectedPart1Topic: "",

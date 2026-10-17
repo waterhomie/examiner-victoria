@@ -227,6 +227,8 @@ export default function App() {
         canScoreNow={capabilities.canScoreNow}
         changePracticeType={controller.changePracticeType}
         changeTrainingMode={controller.changeTrainingMode}
+        changeFeedbackAdaptation={controller.changeFeedbackAdaptation}
+        feedbackAdaptation={state.feedbackAdaptation}
         createFreshSession={controller.createFreshSession}
         currentPhase={currentPhase}
         downloadPracticeRecord={controller.downloadPracticeRecord}

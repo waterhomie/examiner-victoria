@@ -74,6 +74,11 @@ h1 {
   display: none;
 }
 
+.mobile-more-menu.adaptive-settings-menu { display: block; position: relative; }
+.adaptive-feedback-setting { display: flex; gap: 8px; align-items: flex-start; min-width: 230px; padding: 10px; font-size: 0.85rem; }
+.adaptive-feedback-setting input { flex-shrink: 0; margin-top: 3px; }
+.adaptive-feedback-setting small { display: block; color: var(--muted); margin-top: 4px; }
+
 .mobile-more-menu summary {
   min-height: 38px;
   display: inline-flex;

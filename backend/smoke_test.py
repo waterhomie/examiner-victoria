@@ -28,6 +28,7 @@ import backend.routes.audio as audio_routes
 from backend.app import app
 from backend.engine import build_fallback_report, build_session_learning_summary
 from backend.schemas import ExamSession
+from backend.adaptive_feedback_test import run_adaptive_checks
 
 
 DETERMINISTIC_REPORT = """# IELTS Speaking Report
@@ -878,6 +879,7 @@ def assert_mock_mode_starts_cleanly(client: TestClient) -> None:
 
 
 def main() -> None:
+    run_adaptive_checks()
     assert config.ROOT_DIR == Path(__file__).resolve().parents[1], config.ROOT_DIR
     assert config.DEFAULT_FRONTEND_DIST == config.ROOT_DIR / "frontend" / "dist"
     assert config.BACKEND_ENV_FILE == config.ROOT_DIR / "backend" / ".env"

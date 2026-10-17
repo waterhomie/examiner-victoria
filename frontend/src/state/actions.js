@@ -3,6 +3,7 @@ export const ACTIONS = {
   ANSWER_REQUESTED: "answer/requested",
   ANSWER_SUCCEEDED: "answer/succeeded",
   AUDIO_TOGGLED: "audio/toggled",
+  FEEDBACK_ADAPTATION_SET: "feedback/adaptation-set",
   BUSY_SET: "ui/busy-set",
   CLOCK_TICK_SET: "timer/clock-tick-set",
   DRAFT_CLEARED: "composer/draft-cleared",
@@ -28,6 +29,7 @@ export const answerFailed = (message) => ({ type: ACTIONS.ANSWER_FAILED, message
 export const answerRequested = () => ({ type: ACTIONS.ANSWER_REQUESTED });
 export const answerSucceeded = (session) => ({ type: ACTIONS.ANSWER_SUCCEEDED, session });
 export const audioToggled = () => ({ type: ACTIONS.AUDIO_TOGGLED });
+export const feedbackAdaptationSet = (value) => ({ type: ACTIONS.FEEDBACK_ADAPTATION_SET, value });
 export const busySet = (busy) => ({ type: ACTIONS.BUSY_SET, busy });
 export const clockTickSet = (clockTick) => ({ type: ACTIONS.CLOCK_TICK_SET, clockTick });
 export const draftCleared = () => ({ type: ACTIONS.DRAFT_CLEARED });

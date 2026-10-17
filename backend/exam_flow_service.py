@@ -88,6 +88,7 @@ def start_session(
     cue_card_title: str | None = None,
     answer_expansion_mode: bool = True,
     voice_playback_enabled: bool = True,
+    feedback_adaptation: str = "standard",
 ) -> ExamSession:
     selected_topic = choose_part1_topic(part1_topic)
     cue_card = choose_cue_card(cue_card_title)
@@ -105,6 +106,7 @@ def start_session(
         practice_type=practice_type,
         answer_expansion_mode=answer_expansion_mode,
         voice_playback_enabled=voice_playback_enabled,
+        feedback_adaptation=feedback_adaptation if practice_mode and practice_type == "part1" else "standard",
         part1_topic=selected_topic["name"],
         part1_secondary_questions=secondary_questions,
         part3_target_count=PRACTICE_PART3_QUESTION_COUNT if practice_mode else MOCK_PART3_QUESTION_COUNT,

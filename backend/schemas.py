@@ -8,6 +8,30 @@ from pydantic import BaseModel, Field
 Role = Literal["assistant", "user", "system"]
 PracticeType = Literal["full", "part1", "part2", "part3"]
 QuestionSource = Literal["bank", "dynamic", "fallback"]
+FeedbackAdaptation = Literal["standard", "adaptive"]
+SupportState = Literal["unknown", "guided", "balanced", "refinement"]
+EvidenceState = Literal["guided", "balanced", "refinement"]
+SupportReason = Literal["basic_language", "clear_language", "precise_language"]
+SUPPORT_WINDOW = 5
+
+
+class SupportObservation(BaseModel):
+    state: EvidenceState
+    reason: SupportReason
+    answer_index: int = Field(ge=1, le=10000)
+    fingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class LearnerSupportProfile(BaseModel):
+    version: Literal[1] = 1
+    state: SupportState = "unknown"
+    observations: list[SupportObservation] = Field(default_factory=list, max_length=SUPPORT_WINDOW)
+    pending_state: EvidenceState | None = None
+    pending_count: int = Field(default=0, ge=0, le=1)
+    last_processed_answer_index: int = Field(default=0, ge=0, le=10000)
+    notice_shown: bool = False
+
+
 Phase = Literal[
     "identity",
     "part1",
@@ -22,6 +46,7 @@ class ChatMessage(BaseModel):
     role: Role
     content: str
     phase: Phase | None = None
+    adaptation_notice: bool = False
 
 
 class AnswerStats(BaseModel):
@@ -52,6 +77,8 @@ class ExamSession(BaseModel):
     answer_expansion_mode: bool = True
     voice_playback_enabled: bool = True
     speak_full_reply: bool = False
+    feedback_adaptation: FeedbackAdaptation = "standard"
+    learner_support_profile: LearnerSupportProfile = Field(default_factory=LearnerSupportProfile)
 
     part1_index: int = 0
     part1_topic: str = ""
@@ -83,6 +110,7 @@ class StartSessionRequest(BaseModel):
     cue_card_title: str | None = None
     answer_expansion_mode: bool = True
     voice_playback_enabled: bool = True
+    feedback_adaptation: FeedbackAdaptation = "standard"
 
 
 class StartSessionResponse(BaseModel):

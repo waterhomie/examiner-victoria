@@ -17,6 +17,7 @@ import {
   clockTickSet,
   draftSet,
   errorSet,
+  feedbackAdaptationSet,
   healthLoaded,
   modeSet,
   modeToggled,
@@ -112,6 +113,7 @@ export function useExamController({
           practice_type: nextPracticeType,
           part1_topic: nextPart1Topic || null,
           cue_card_title: nextCueCardTitle || null,
+          feedback_adaptation: nextIsPracticeMode && nextPracticeType === "part1" ? state.feedbackAdaptation : "standard",
         });
         dispatch(sessionStartSucceeded(data.session));
         if (data.session.phase === "part2_long") {
@@ -130,6 +132,7 @@ export function useExamController({
       selectedPart1Topic,
       stopCurrentAudio,
       trainingMode,
+      state.feedbackAdaptation,
     ],
   );
 
@@ -140,6 +143,10 @@ export function useExamController({
     }
     dispatch(audioToggled());
   }, [clearPendingSpeech, dispatch, state.audioEnabled, stopCurrentAudio]);
+
+  const changeFeedbackAdaptation = useCallback((event) => {
+    dispatch(feedbackAdaptationSet(event.target.checked ? "adaptive" : "standard"));
+  }, [dispatch]);
 
   const changePracticeType = useCallback(
     (event) => {
@@ -274,6 +281,7 @@ export function useExamController({
   }, [report, session]);
 
   return {
+    changeFeedbackAdaptation,
     changeCueCardTitle,
     changePart1Topic,
     changePracticeType,

@@ -12,6 +12,7 @@ function restoreFromSnapshot(state, snapshot) {
   return {
     ...state,
     session,
+    feedbackAdaptation: session?.feedback_adaptation === "adaptive" ? "adaptive" : "standard",
     report: snapshot?.report || "",
     audioEnabled: snapshot?.audioEnabled ?? true,
     trainingMode: snapshot?.trainingMode || (session?.practice_mode ? "practice" : "mock"),
@@ -41,6 +42,11 @@ export function appReducer(state, action) {
       return { ...state, busy: "", session: action.session };
     case ACTIONS.AUDIO_TOGGLED:
       return { ...state, audioEnabled: !state.audioEnabled };
+    case ACTIONS.FEEDBACK_ADAPTATION_SET: {
+      if (state.busy || state.trainingMode !== "practice" || state.practiceType !== "part1" || !state.session) return state;
+      const value = action.value === "adaptive" ? "adaptive" : "standard";
+      return { ...state, feedbackAdaptation: value, session: { ...state.session, feedback_adaptation: value } };
+    }
     case ACTIONS.BUSY_SET:
       return { ...state, busy: action.busy };
     case ACTIONS.CLOCK_TICK_SET:
@@ -93,6 +99,7 @@ export function appReducer(state, action) {
         busy: "",
         session: action.session,
         audioEnabled: action.session?.voice_playback_enabled ?? state.audioEnabled,
+        feedbackAdaptation: action.session?.feedback_adaptation === "adaptive" ? "adaptive" : "standard",
       };
     case ACTIONS.STORAGE_READY_SET:
       return { ...state, storageReady: Boolean(action.storageReady) };

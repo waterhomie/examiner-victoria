@@ -7,6 +7,8 @@ export function ExamHeader({
   canScoreNow,
   changePracticeType,
   changeTrainingMode,
+  changeFeedbackAdaptation,
+  feedbackAdaptation,
   createFreshSession,
   currentPhase,
   downloadPracticeRecord,
@@ -97,9 +99,17 @@ export function ExamHeader({
             Restart
           </button>
         </div>
-        <details className="mobile-more-menu">
+        <details className={`mobile-more-menu ${isPracticeMode && practiceType === "part1" ? "adaptive-settings-menu" : ""}`}>
           <summary>More</summary>
           <div className="mobile-more-panel">
+            {isPracticeMode && practiceType === "part1" ? (
+              <label className="adaptive-feedback-setting">
+                <input type="checkbox" data-testid="adaptive-feedback-toggle"
+                  checked={feedbackAdaptation === "adaptive"} disabled={controlsDisabled || !session}
+                  onChange={changeFeedbackAdaptation} />
+                <span>Adapt feedback to my answers <small>Experimental · this session</small></span>
+              </label>
+            ) : null}
             <button type="button" onClick={openRuntimeDiagnostics} data-testid="mobile-runtime-diagnostics-button">
               System check
             </button>
