@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import "./feedback_playback_test.js";
 import { readFileSync } from "node:fs";
 
 import { fetchRuntimeDiagnostics, healthCheck, sendAnswer, sendTelemetryEvent, synthesizeSpeech, TTS_TIMEOUT_MS } from "./src/api.js";

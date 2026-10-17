@@ -58,7 +58,7 @@
 | F-012 | T003 | Could not find a previous Practice or Mock record after completing a session. | Storage, retention, restart behavior, discoverability, export, and long-term history are different concerns. | Local session recovery plus report, transcript, and practice-record export exist; accounts, cloud history, cross-device records, and a history list do not. | Treat this as partially solved but a confirmed usability issue; audit recovery, restart, and export discoverability before adding a database. | P1 | Partially solved, usability issue confirmed |
 | F-013 | T003 | Wants optional Chinese translation of Victoria's English content in Practice. | Translation may reduce comprehension barriers but can increase visual load and dependence. | The interface primarily provides English prompts and English text fallback; optional Chinese translation is not implemented. | Validate collapsed, on-demand Chinese translation in Practice only; do not enable it by default in Mock. | P2 | New request, needs validation |
 | F-014 | T003 | Wants a Chinese-to-English drill in which the system supplies Chinese ideas and then corrects the user's English. | This is a distinct training mode rather than an extension of the current IELTS Part 1/2/3 flow. | No dedicated Chinese-to-English drill exists, and acoustic pronunciation scoring remains outside current capability. | Record as a separate mode exploration and wait for repeated demand; do not add it to the stable V3 Beta flow now. | Roadmap | New mode idea |
-| F-015 | T004 | Wants corrected or improved wording to play directly as audio. | Learners want to hear natural delivery, but many permanent playback buttons could make feedback visually heavy. | TTS plays Victoria's next question or system speech; direct playback for correction, expression tip, or natural version is not implemented. | Treat tap-to-play correction text as a provisional interaction direction and validate discoverability before implementation. | P1 | Proposed, not implemented |
+| F-015 | T004 | Wants corrected or improved wording to play directly as audio. | Learners want to hear natural delivery without extra permanent playback buttons. | Practice feedback text supports tap-to-play using existing TTS, with loading, stop, cache and browser playback fallback. | Tap correction, better expression or natural-version text; show a first-use tip and validate mobile discoverability. | P1 | Implemented locally; device validation pending |
 | F-016 | T005 | Wants answer ideas and material based on the user's own topics and personal experiences. | The product must distinguish correction, generic examples, idea prompts, personalized material, and complete ghostwritten answers. | Topic and cue-card selection plus answer-level language feedback exist; structured profiles, personalized-material flow, accounts, and long-term personal data storage do not. | Explore an optional Practice-only, session-level idea flow based only on facts the user voluntarily provides; never invent experiences or default to complete scripts. | P2 | New request, needs validation |
 
 ## 3A. External Review Signals
@@ -283,17 +283,19 @@ Current capability:
 
 - TTS is implemented.
 - The answer response speaks Victoria's next question or system speech.
-- Correction, expression tip, and natural-version text do not currently have direct playback behavior.
+- Practice correction, expression-tip and natural-version text now support direct tap-to-play in the local F-015 implementation, using the same TTS endpoint and cache.
 
-Provisional interaction direction:
+Interaction implemented locally on 2026-10-17:
 
-- allow the learner to tap selected correction or natural-version text to play it;
-- avoid adding a permanent button beside every text block unless testing shows it is needed;
-- provide a lightweight first-use hint;
-- validate whether playback should cover correction, natural version, examples, or all three;
-- verify that tap-to-play is discoverable and unambiguous on mobile.
+- tap the feedback text block itself to play it; tap the active block again to stop or cancel;
+- no separate permanent audio button or idle playback label beside each block;
+- show one first-use tip, dismissed after the first feedback tap and remembered locally;
+- cover Quick correction, Better expression and Natural version, excluding the next examiner question;
+- reuse speech cache, browser playback fallback and TTS failure messaging;
+- disable feedback taps during recording or answer processing, and discard superseded speech results;
+- mobile discoverability and iPhone/WeChat audio acceptance still require device validation.
 
-Status: P1, proposed and not implemented. This round does not modify TTS or frontend behavior.
+Status: P1, implemented locally; deployment and real-device follow-up validation pending. Backend Prompt, scoring and TTS provider are unchanged.
 
 ### F-016 | Personalized answer inspiration from real experiences
 

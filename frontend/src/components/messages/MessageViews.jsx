@@ -1,3 +1,5 @@
+import { splitFeedbackPlayback } from "../../utils/feedbackPlayback.js";
+
 function renderInline(text, keyPrefix) {
   return String(text || "")
     .split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
@@ -225,8 +227,9 @@ export function ReportView({ report }) {
   );
 }
 
-export function MessageBubble({ message }) {
+export function MessageBubble({ message, feedbackPlayback }) {
   const isUser = message.role === "user";
+  const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(message.content) : null;
   return (
     <article
       className={`message-row ${isUser ? "user" : "assistant"}`}
@@ -237,7 +240,30 @@ export function MessageBubble({ message }) {
         {isUser ? "Y" : "V"}
       </div>
       <div className="bubble">
-        <RichMessage content={message.content} />
+        {sections ? sections.map((section, index) => {
+          if (!section.text) return <RichMessage key={index} content={section.content} />;
+          const active = feedbackPlayback.text === section.text;
+          const status = active ? feedbackPlayback.status : "";
+          return (
+            <div key={index} className={`feedback-playback ${active ? "active" : ""}`}
+              role="button" tabIndex={feedbackPlayback.disabled ? -1 : 0}
+              aria-disabled={feedbackPlayback.disabled}
+              aria-label={`${active ? "Stop" : "Play"} ${section.label}`}
+              aria-pressed={active}
+              onClick={() => { if (!feedbackPlayback.disabled) feedbackPlayback.onPlay(section.text); }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  if (!feedbackPlayback.disabled) feedbackPlayback.onPlay(section.text);
+                }
+              }}>
+              <RichMessage content={section.content} />
+              {active ? <span className="feedback-playback-status" aria-live="polite">
+                {status === "loading" ? "Preparing audio… Tap to cancel" : status === "playing" ? "Playing · Tap to stop" : "Audio ready · Tap again to play"}
+              </span> : null}
+            </div>
+          );
+        }) : <RichMessage content={message.content} />}
       </div>
     </article>
   );

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
 
@@ -38,6 +39,7 @@ export function ChatPanel({
   downloadReport,
   downloadTranscript,
   error,
+  feedbackPlayback,
   messages,
   mockExam,
   pendingSpeechUrl,
@@ -47,12 +49,25 @@ export function ChatPanel({
   retryLastRecording,
   shortScrollSlackRef,
 }) {
+  const [showPlaybackTip, setShowPlaybackTip] = useState(() => {
+    try { return window.localStorage.getItem("victoria-feedback-playback-tip") !== "seen"; }
+    catch { return true; }
+  });
+  const playback = feedbackPlayback ? { ...feedbackPlayback, onPlay: (text) => {
+    setShowPlaybackTip(false);
+    try { window.localStorage.setItem("victoria-feedback-playback-tip", "seen"); } catch { /* Optional hint only. */ }
+    feedbackPlayback.onPlay(text);
+  } } : null;
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
       <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
 
+      {showPlaybackTip && playback && messages.some((message) => message.role === "assistant" && /\*\*(Quick correction|Better expression|A natural version of your answer):/.test(message.content)) ? (
+        <p className="feedback-playback-hint" role="note">Tip: tap a correction or natural version to hear it. Tap again to stop.</p>
+      ) : null}
+
       {messages.map((message, index) => (
-        <MessageBubble key={`${message.role}-${index}`} message={message} />
+        <MessageBubble key={`${message.role}-${index}`} message={message} feedbackPlayback={playback} />
       ))}
 
       {busy ? (
