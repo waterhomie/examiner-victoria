@@ -17,6 +17,7 @@ Local implementation date: 2026-10-17. Branch: `feat/feedback-text-playback`.
 
 - Project checks: Python compilation, question-bank validation, FastAPI smoke tests, deployment configuration, frontend smoke tests and production build passed using the project `.venv` Python.
 - Added feedback parsing checks for correction, expression, multiline quoted natural version, CRLF, missing quote and exclusion of the next question. Included in the existing frontend smoke test.
+- Added deterministic audio-hook regression checks with a delayed iOS-style unlock promise. Manual playback starts the unlock after cleanup and waits for it without interrupting it; stopping or switching blocks invalidates stale continuations. Tests cover Natural version body-only speech, automatic sound disabled, cache reuse, completion cleanup and blocked-playback retry.
 - Browser regression ran against the local frontend with synthetic session data, intercepted API responses and a mocked Audio element. Verified tap, stop, manual playback with automatic audio disabled, cache reuse, superseded-request cancellation, end-state cleanup, browser-blocked playback recovery, hint persistence and provider failure recovery.
 - Inspected a 390 x 844 mobile layout before playback and during playback.
 - Browser simulation does not establish real audio quality or iPhone/WeChat acceptance. Real-device validation and production deployment remain pending.

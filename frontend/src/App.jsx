@@ -215,9 +215,8 @@ export default function App() {
       clearPendingSpeech();
       return;
     }
-    unlockAudio(true);
     void playSpeech(text, state.session?.session_id, { manual: true });
-  }, [clearPendingSpeech, playPendingSpeech, playSpeech, recording, setError, speechState.status, speechState.text, state.busy, state.session?.session_id, stopCurrentAudio, unlockAudio]);
+  }, [clearPendingSpeech, playPendingSpeech, playSpeech, recording, setError, speechState.status, speechState.text, state.busy, state.session?.session_id, stopCurrentAudio]);
 
   return (
     <div className="app-shell">

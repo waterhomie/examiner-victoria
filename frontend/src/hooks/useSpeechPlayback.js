@@ -30,10 +30,10 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
     return audioRef.current;
   }, []);
 
-  const stopCurrentAudio = useCallback(() => {
+  const stopCurrentAudio = useCallback(({ preserveUnlock = false } = {}) => {
     speechRequestRef.current += 1;
     setSpeechState({ text: "", status: "" });
-    if (audioRef.current) {
+    if (audioRef.current && !(preserveUnlock && unlockPromiseRef.current)) {
       audioRef.current.pause();
       audioRef.current.removeAttribute("src");
       audioRef.current.load();
@@ -150,13 +150,17 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
   const playSpeech = useCallback(
     async (text, sessionId = "", options = {}) => {
       if ((!audioEnabled && !options.manual) || !text) return;
-      stopCurrentAudio();
+      // Keep a user-gesture unlock alive until its play() promise settles.
+      // Explicit stop/recording actions still cancel it and invalidate this request.
+      stopCurrentAudio({ preserveUnlock: true });
       clearPendingSpeech();
       const requestId = speechRequestRef.current;
       setSpeechState({ text, status: "loading" });
       let url = "";
       try {
-        await unlockPromiseRef.current;
+        // Start manual unlock synchronously in the tap handler, after cleanup.
+        // Waiting in App would leave a continuation that a later stop cannot cancel.
+        await (options.manual ? unlockAudio(true) : unlockPromiseRef.current);
         if (requestId !== speechRequestRef.current) return;
         const blob = await getSpeechBlob(text, sessionId);
         if (requestId !== speechRequestRef.current) return;
@@ -191,7 +195,7 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
         }
       }
     },
-    [audioEnabled, clearPendingSpeech, getSpeechBlob, onErrorChange, playAudioUrl, stopCurrentAudio],
+    [audioEnabled, clearPendingSpeech, getSpeechBlob, onErrorChange, playAudioUrl, stopCurrentAudio, unlockAudio],
   );
 
   const playPendingSpeech = useCallback(async () => {
