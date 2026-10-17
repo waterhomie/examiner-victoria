@@ -20,5 +20,6 @@ def create_session(request_body: StartSessionRequest, request: Request) -> Start
         cue_card_title=request_body.cue_card_title,
         answer_expansion_mode=request_body.answer_expansion_mode,
         voice_playback_enabled=request_body.voice_playback_enabled,
+        feedback_adaptation=request_body.feedback_adaptation,
     )
     return StartSessionResponse(session=session)

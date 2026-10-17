@@ -13,6 +13,8 @@ from .exam_flow_service import (
     start_session,
 )
 from .feedback_service import build_reply, coach_spoken_answer
+from .part1_feedback_service import coach_part1_answer
+from .learner_support_service import is_focused_part1, is_system_rewrite, merge_observation
 from .question_bank_service import (
     get_practice_options,
     get_question_bank_summary,
@@ -67,12 +69,26 @@ def process_answer(
     expression_tip = None
     upgraded_answer = None
     feedback_available = True
+    adaptation_notice = False
     include_upgrade = (
         session.practice_mode
         and session.answer_expansion_mode
         and phase in {"part1", "part2_followup", "part3"}
     )
-    if session.practice_mode and phase != "identity":
+    if is_focused_part1(session):
+        adaptive = session.feedback_adaptation == "adaptive"
+        profile = session.learner_support_profile
+        result = coach_part1_answer(previous_question, answer, include_upgrade,
+                                    profile if adaptive else None, is_system_rewrite(session, answer))
+        correction, expression_tip, upgraded_answer, feedback_available = result.feedback
+        if adaptive:
+            repeated = any(item.question == previous_question and item.answer.strip() == answer.strip()
+                           for item in session.candidate_answers[:-1])
+            merge_observation(profile, None if repeated else result.observation,
+                              previous_question, answer, len(session.candidate_answers))
+            adaptation_notice = feedback_available and not profile.notice_shown
+            profile.notice_shown = profile.notice_shown or adaptation_notice
+    elif session.practice_mode and phase != "identity":
         correction, expression_tip, upgraded_answer, feedback_available = coach_spoken_answer(
             previous_question,
             answer,
@@ -105,6 +121,7 @@ def process_answer(
         session.current_question = next_content
 
     reply = build_reply(correction, expression_tip, upgraded_answer, next_content, feedback_available)
-    assistant_message = ChatMessage(role="assistant", content=reply, phase=session.phase)
+    assistant_message = ChatMessage(role="assistant", content=reply, phase=session.phase,
+                                    adaptation_notice=adaptation_notice)
     session.messages.append(assistant_message)
     return session, assistant_message, next_content, start_prep_timer

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
 
@@ -67,7 +67,12 @@ export function ChatPanel({
       ) : null}
 
       {messages.map((message, index) => (
-        <MessageBubble key={`${message.role}-${index}`} message={message} feedbackPlayback={playback} />
+        <Fragment key={`${message.role}-${index}`}>
+          {message.adaptation_notice ? <p className="feedback-playback-hint" role="note">
+            Feedback adjusts to your answers in this session. This is not an IELTS level assessment.
+          </p> : null}
+          <MessageBubble message={message} feedbackPlayback={playback} />
+        </Fragment>
       ))}
 
       {busy ? (
