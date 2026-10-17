@@ -44,6 +44,7 @@ export default function App() {
 
   const {
     clearPendingSpeech,
+    speechState,
     pendingSpeechUrl,
     playPendingSpeech,
     playSpeech,
@@ -202,6 +203,21 @@ export default function App() {
     void toggleRecording();
   }, [recording, stopCurrentAudio, toggleRecording, unlockAudio]);
 
+  const playFeedback = useCallback((text) => {
+    if (state.busy || recording) return;
+    setError("");
+    if (speechState.text === text) {
+      if (speechState.status === "pending") {
+        void playPendingSpeech();
+        return;
+      }
+      stopCurrentAudio();
+      clearPendingSpeech();
+      return;
+    }
+    void playSpeech(text, state.session?.session_id, { manual: true });
+  }, [clearPendingSpeech, playPendingSpeech, playSpeech, recording, setError, speechState.status, speechState.text, state.busy, state.session?.session_id, stopCurrentAudio]);
+
   return (
     <div className="app-shell">
       <ExamHeader
@@ -260,6 +276,7 @@ export default function App() {
         downloadReport={controller.downloadReport}
         downloadTranscript={controller.downloadTranscript}
         error={state.error}
+        feedbackPlayback={sessionView.isPracticeMode ? { ...speechState, onPlay: playFeedback, disabled: Boolean(state.busy || recording) } : null}
         messages={messages}
         mockExam={sessionView.mockExam}
         pendingSpeechUrl={pendingSpeechUrl}
