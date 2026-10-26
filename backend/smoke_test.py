@@ -460,6 +460,12 @@ def set_tts_config(
 ) -> dict[str, object]:
     originals = {
         "provider": config.TTS_PROVIDER,
+        "api_key": config.API_KEY,
+        "base_url": config.BASE_URL,
+        "tts_model": config.TTS_MODEL,
+        "tts_voice": config.TTS_VOICE,
+        "tts_response_format": config.TTS_RESPONSE_FORMAT,
+        "tts_speed": config.TTS_SPEED,
         "secret_id": config.TENCENTCLOUD_SECRET_ID,
         "secret_key": config.TENCENTCLOUD_SECRET_KEY,
         "voice_type": config.TENCENT_TTS_VOICE_TYPE,
@@ -495,6 +501,12 @@ def set_tts_config(
 
 def restore_tts_config(originals: dict[str, object]) -> None:
     config.TTS_PROVIDER = originals["provider"]
+    config.API_KEY = originals["api_key"]
+    config.BASE_URL = originals["base_url"]
+    config.TTS_MODEL = originals["tts_model"]
+    config.TTS_VOICE = originals["tts_voice"]
+    config.TTS_RESPONSE_FORMAT = originals["tts_response_format"]
+    config.TTS_SPEED = originals["tts_speed"]
     config.TENCENTCLOUD_SECRET_ID = originals["secret_id"]
     config.TENCENTCLOUD_SECRET_KEY = originals["secret_key"]
     config.TENCENT_TTS_VOICE_TYPE = originals["voice_type"]
@@ -931,6 +943,10 @@ def main() -> None:
         "tts_enabled",
         "tts_provider",
         "tts_configured",
+        "tts_model",
+        "tts_voice",
+        "tts_format",
+        "tts_speed",
         "tts_region",
         "tts_voice_type",
         "tts_codec",
@@ -948,7 +964,7 @@ def main() -> None:
     assert "api_key" not in str(diagnostics_payload).lower(), diagnostics_payload
     assert "sk-" not in str(diagnostics_payload), diagnostics_payload
     assert "base_url" not in diagnostics_payload, diagnostics_payload
-    assert diagnostics_payload["tts_provider"] in {"disabled", "gtts", "tencent"}, diagnostics_payload
+    assert diagnostics_payload["tts_provider"] in {"disabled", "gtts", "openai_compatible", "tencent"}, diagnostics_payload
     assert isinstance(diagnostics_payload["tts_configured"], bool), diagnostics_payload
     assert diagnostics_payload["tts_region"] == "ap-shanghai", diagnostics_payload
     assert diagnostics_payload["tts_voice_type"] in {"unknown", str(config.TENCENT_TTS_VOICE_TYPE).strip()}, diagnostics_payload
@@ -1100,6 +1116,100 @@ def main() -> None:
         assert successful_tts.headers.get("x-tts-duration-ms") is not None, successful_tts.headers
         assert successful_tts.content == b"fake-mp3-audio", successful_tts.content
 
+        config.TTS_PROVIDER = "openai_compatible"
+        config.API_KEY = "mock-api-key"
+        config.BASE_URL = "https://api.example.test/v1"
+        config.TTS_MODEL = "tts-1"
+        config.TTS_VOICE = "nova"
+        config.TTS_RESPONSE_FORMAT = "mp3"
+        config.TTS_SPEED = 1.0
+        audio_routes.synthesize_speech = audio_services.synthesize_speech
+        captured_speech_request: dict[str, object] = {}
+
+        class FakeSpeechResponse:
+            headers = {"x-request-id": "mock-openai-request-id"}
+
+            def read(self) -> bytes:
+                return b"mock-openai-mp3-audio"
+
+        def fake_speech_create(**kwargs):
+            captured_speech_request.update(kwargs)
+            return FakeSpeechResponse()
+
+        fake_openai_client = types.SimpleNamespace(
+            audio=types.SimpleNamespace(
+                speech=types.SimpleNamespace(create=fake_speech_create),
+            )
+        )
+        original_audio_get_client = audio_services.get_client
+        audio_services.get_client = lambda: fake_openai_client
+        try:
+            openai_compatible_tts = client.post(
+                "/api/tts",
+                json={"text": "Hello Victoria", "session_id": "openai-compatible-success"},
+            )
+        finally:
+            audio_services.get_client = original_audio_get_client
+
+        assert openai_compatible_tts.status_code == 200, openai_compatible_tts.text
+        assert openai_compatible_tts.headers["content-type"].startswith("audio/mpeg")
+        assert openai_compatible_tts.content == b"mock-openai-mp3-audio"
+        assert captured_speech_request == {
+            "model": "tts-1",
+            "voice": "nova",
+            "input": "Hello Victoria",
+            "response_format": "mp3",
+            "speed": 1.0,
+        }, captured_speech_request
+        assert audio_services.tts_provider_is_configured() is True
+        openai_diagnostics = client.get("/api/diagnostics/runtime").json()
+        assert {
+            "tts_provider": "openai_compatible",
+            "tts_model": "tts-1",
+            "tts_voice": "nova",
+            "tts_format": "mp3",
+            "tts_speed": 1.0,
+        }.items() <= openai_diagnostics.items(), openai_diagnostics
+        assert "mock-api-key" not in str(openai_diagnostics), openai_diagnostics
+
+        sensitive_openai_text = "private openai-compatible speech text"
+
+        def failing_speech_create(**_kwargs):
+            raise RuntimeError(
+                f"API_KEY=mock-api-key input={sensitive_openai_text} upstream failure"
+            )
+
+        fake_openai_client.audio.speech.create = failing_speech_create
+        audio_services.get_client = lambda: fake_openai_client
+        try:
+            audio_services.TTS_CACHE.clear()
+            failed_openai_tts, openai_tts_logs = capture_tts_logs(
+                client,
+                text=sensitive_openai_text,
+                session_id="openai-compatible-failure",
+            )
+        finally:
+            audio_services.get_client = original_audio_get_client
+        assert failed_openai_tts.status_code == 502, failed_openai_tts.text
+        assert "error_code=OPENAI_COMPATIBLE_RuntimeError" in openai_tts_logs, openai_tts_logs
+        assert "provider=openai_compatible" in openai_tts_logs, openai_tts_logs
+        assert "mock-api-key" not in openai_tts_logs, openai_tts_logs
+        assert sensitive_openai_text not in openai_tts_logs, openai_tts_logs
+
+        invalid_openai_values = (
+            ("API_KEY", "mock-api-key\nunsafe"),
+            ("BASE_URL", "not-a-url"),
+            ("TTS_MODEL", "tts model"),
+            ("TTS_VOICE", "nova/unsafe"),
+            ("TTS_RESPONSE_FORMAT", "exe"),
+            ("TTS_SPEED", 4.1),
+        )
+        for config_name, invalid_value in invalid_openai_values:
+            original_value = getattr(config, config_name)
+            setattr(config, config_name, invalid_value)
+            assert audio_services.tts_provider_is_configured() is False, config_name
+            setattr(config, config_name, original_value)
+
         config.TTS_PROVIDER = "tencent"
         audio_routes.synthesize_speech = audio_services.synthesize_speech
         config.TENCENTCLOUD_SECRET_ID = ""
@@ -1196,10 +1306,10 @@ def main() -> None:
                 assert "Z" * 241 not in logged_message, logged_message
                 assert "request_id=mock-error-request-id" in tts_logs, tts_logs
                 assert "provider=tencent" in tts_logs, tts_logs
-                assert "voice_type=501009" in tts_logs, tts_logs
-                assert "region=ap-shanghai" in tts_logs, tts_logs
-                assert "codec=mp3" in tts_logs, tts_logs
-                assert "sample_rate=16000" in tts_logs, tts_logs
+                assert "model=1" in tts_logs, tts_logs
+                assert "voice=501009" in tts_logs, tts_logs
+                assert "format=mp3" in tts_logs, tts_logs
+                assert "speed=0.0" in tts_logs, tts_logs
                 for forbidden_value in (
                     "mock-secret-id",
                     "SecretId",

@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from ..core import config
 from ..audio_services import (
     get_tencent_tts_public_diagnostics,
+    get_tts_public_diagnostics,
     normalize_tts_provider_name,
     tts_provider_is_configured,
 )
@@ -40,6 +41,7 @@ def runtime_diagnostics() -> RuntimeDiagnosticsResponse:
         "tts_enabled": tts_provider_is_configured(),
         "tts_provider": normalize_tts_provider_name(),
         "tts_configured": tts_provider_is_configured(),
+        **get_tts_public_diagnostics(),
         **get_tencent_tts_public_diagnostics(),
         "tts_max_concurrency": config.TTS_MAX_CONCURRENCY,
         "tts_rate_limit_per_minute": config.TTS_RATE_LIMIT_PER_MINUTE,

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import io
 import re
 from threading import Lock
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from .ai_provider import TRANSCRIPTION_MODEL, TTS_CACHE_MAX_ITEMS, get_client
@@ -53,7 +54,7 @@ def _safe_tts_error_message(message: object, *, secrets: tuple[str, ...] = ()) -
         "[redacted credential]",
         cleaned,
     )
-    return cleaned[:TTS_ERROR_MESSAGE_LIMIT] or "Tencent Cloud TTS request failed"
+    return cleaned[:TTS_ERROR_MESSAGE_LIMIT] or "TTS provider request failed"
 
 
 def _exception_detail(error: Exception, method_name: str, attribute_names: tuple[str, ...]) -> object | None:
@@ -116,6 +117,7 @@ def get_safe_tts_error_log_fields(error: Exception) -> dict[str, str]:
             secrets=(
                 str(config.TENCENTCLOUD_SECRET_ID or "").strip(),
                 str(config.TENCENTCLOUD_SECRET_KEY or "").strip(),
+                str(config.API_KEY or "").strip(),
             ),
         )
         request_id = error.request_id or ""
@@ -166,6 +168,132 @@ class GttsTTSProvider(BaseTTSProvider):
             audio=audio_buffer.getvalue(),
             content_type=self.content_type,
             provider=self.name,
+        )
+
+
+@dataclass(frozen=True)
+class OpenAICompatibleTTSRuntimeConfig:
+    model: str
+    voice: str
+    response_format: str
+    speed: float
+
+
+def _validated_openai_compatible_tts_config() -> OpenAICompatibleTTSRuntimeConfig:
+    api_key = str(config.API_KEY or "").strip()
+    base_url = str(config.BASE_URL or "").strip()
+    model = str(config.TTS_MODEL or "").strip()
+    voice = str(config.TTS_VOICE or "").strip()
+    response_format = str(config.TTS_RESPONSE_FORMAT or "").strip().lower()
+    speed = float(config.TTS_SPEED)
+    parsed_base_url = urlparse(base_url)
+
+    if (
+        not api_key
+        or len(api_key) > 512
+        or any(ord(character) < 32 for character in api_key)
+    ):
+        raise TTSProviderError(
+            "OpenAI-compatible TTS API key is missing or invalid",
+            error_code="TTS_CONFIG_ERROR",
+        )
+    if parsed_base_url.scheme not in {"http", "https"} or not parsed_base_url.netloc:
+        raise TTSProviderError(
+            "OpenAI-compatible TTS base URL is invalid",
+            error_code="TTS_CONFIG_ERROR",
+        )
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", model):
+        raise TTSProviderError("OpenAI-compatible TTS model is invalid", error_code="TTS_CONFIG_ERROR")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", voice):
+        raise TTSProviderError("OpenAI-compatible TTS voice is invalid", error_code="TTS_CONFIG_ERROR")
+    if response_format not in {"mp3", "opus", "aac", "flac", "wav", "pcm"}:
+        raise TTSProviderError("OpenAI-compatible TTS format is invalid", error_code="TTS_CONFIG_ERROR")
+    if not 0.25 <= speed <= 4.0:
+        raise TTSProviderError("OpenAI-compatible TTS speed is invalid", error_code="TTS_CONFIG_ERROR")
+
+    return OpenAICompatibleTTSRuntimeConfig(
+        model=model,
+        voice=voice,
+        response_format=response_format,
+        speed=speed,
+    )
+
+
+def _audio_content_type(response_format: str) -> str:
+    return {
+        "mp3": "audio/mpeg",
+        "opus": "audio/ogg",
+        "aac": "audio/aac",
+        "flac": "audio/flac",
+        "wav": "audio/wav",
+        "pcm": "application/octet-stream",
+    }.get(response_format, "application/octet-stream")
+
+
+def _read_openai_compatible_audio(response: object) -> bytes:
+    if isinstance(response, bytes):
+        return response
+    reader = getattr(response, "read", None)
+    if callable(reader):
+        audio = reader()
+    else:
+        audio = getattr(response, "content", b"")
+    if isinstance(audio, bytearray):
+        return bytes(audio)
+    return audio if isinstance(audio, bytes) else b""
+
+
+class OpenAICompatibleTTSProvider(BaseTTSProvider):
+    name = "openai_compatible"
+
+    @property
+    def configured(self) -> bool:
+        try:
+            _validated_openai_compatible_tts_config()
+            return True
+        except (TTSProviderError, TypeError, ValueError):
+            return False
+
+    @property
+    def content_type(self) -> str:
+        response_format = str(config.TTS_RESPONSE_FORMAT or "").strip().lower()
+        return _audio_content_type(response_format)
+
+    def synthesize(self, text: str) -> TTSResult:
+        settings = _validated_openai_compatible_tts_config()
+        try:
+            response = get_client().audio.speech.create(
+                model=settings.model,
+                voice=settings.voice,
+                input=text,
+                response_format=settings.response_format,
+                speed=settings.speed,
+            )
+            audio = _read_openai_compatible_audio(response)
+            headers = getattr(response, "headers", {}) or {}
+            request_id = _safe_tts_request_id(
+                headers.get("x-request-id") if hasattr(headers, "get") else None
+            )
+        except TTSProviderError:
+            raise
+        except Exception as error:
+            error_type = type(error).__name__
+            raise TTSProviderError(
+                error_type,
+                error_code=f"OPENAI_COMPATIBLE_{_safe_tts_error_code(error_type)}",
+            ) from error
+
+        if not audio:
+            raise TTSProviderError(
+                "OpenAI-compatible TTS returned empty audio",
+                error_code="TTS_EMPTY_AUDIO",
+                request_id=request_id,
+            )
+        return TTSResult(
+            audio=audio,
+            content_type=_audio_content_type(settings.response_format),
+            provider=self.name,
+            request_id=request_id,
         )
 
 
@@ -312,8 +440,43 @@ TTS_CACHE_LOCK = Lock()
 TTS_PROVIDERS: dict[str, BaseTTSProvider] = {
     "disabled": DisabledTTSProvider(),
     "gtts": GttsTTSProvider(),
+    "openai_compatible": OpenAICompatibleTTSProvider(),
     "tencent": TencentCloudTTSProvider(),
 }
+
+
+def get_tts_public_diagnostics() -> dict[str, str | int | float]:
+    provider = normalize_tts_provider_name()
+    if provider == "openai_compatible":
+        try:
+            settings = _validated_openai_compatible_tts_config()
+        except (TTSProviderError, TypeError, ValueError):
+            return {
+                "tts_model": "unknown",
+                "tts_voice": "unknown",
+                "tts_format": "unknown",
+                "tts_speed": 1.0,
+            }
+        return {
+            "tts_model": settings.model,
+            "tts_voice": settings.voice,
+            "tts_format": settings.response_format,
+            "tts_speed": settings.speed,
+        }
+    if provider == "tencent":
+        fields = get_tencent_tts_public_diagnostics()
+        return {
+            "tts_model": str(fields["tts_model_type"]),
+            "tts_voice": str(fields["tts_voice_type"]),
+            "tts_format": str(fields["tts_codec"]),
+            "tts_speed": float(config.TENCENT_TTS_SPEED),
+        }
+    return {
+        "tts_model": "unknown",
+        "tts_voice": "unknown",
+        "tts_format": "mp3" if provider == "gtts" else "unknown",
+        "tts_speed": 1.0,
+    }
 
 
 def audio_filename_from_mime(mime_type: str) -> str:

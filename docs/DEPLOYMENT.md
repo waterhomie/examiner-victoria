@@ -52,7 +52,17 @@ https://your-public-domain/api/diagnostics/runtime
 
 Configure non-sensitive settings and secrets in the CloudBase console. Never commit real values or paste them into documentation.
 
-Core provider and safety variable names are documented in [V3 Runtime Dependencies](V3_RUNTIME_DEPENDENCIES.md). The Tencent TTS path uses names including:
+Core provider and safety variable names are documented in [V3 Runtime Dependencies](V3_RUNTIME_DEPENDENCIES.md). The OpenAI-compatible TTS path reuses `API_KEY` and `BASE_URL` and adds:
+
+```text
+TTS_PROVIDER
+TTS_MODEL
+TTS_VOICE
+TTS_RESPONSE_FORMAT
+TTS_SPEED
+```
+
+The retained Tencent TTS rollback path uses:
 
 ```text
 TTS_PROVIDER
@@ -66,7 +76,7 @@ TENCENT_TTS_SPEED
 TENCENT_TTS_VOLUME
 ```
 
-The CloudBase deployment should use `TTS_PROVIDER=tencent`. Credential values belong only in the deployment secret store and should follow CAM least-privilege principles.
+Use `TTS_PROVIDER=openai_compatible` to route speech through the existing OpenAI-compatible provider, or `TTS_PROVIDER=tencent` to retain the Tencent Cloud rollback path. Credential values belong only in the deployment secret store.
 
 Optional build identity uses:
 
@@ -86,7 +96,7 @@ Other backend settings include the existing LLM/STT provider variables, CORS, up
 
 - LLM uses the existing OpenAI-compatible provider adapter.
 - STT uses the existing server transcription path.
-- TTS on CloudBase uses Tencent Cloud TextToVoice through the official Python SDK and project adapter.
+- TTS supports the OpenAI-compatible Audio Speech API through the existing provider key and Tencent Cloud TextToVoice as a rollback provider.
 - gTTS is an explicit local/legacy option only.
 - If TTS is unconfigured, times out, or fails, written feedback and the next question remain available.
 - Runtime logs and diagnostics must not contain credentials, complete environment dumps, recordings, full user answers, or transcripts.
