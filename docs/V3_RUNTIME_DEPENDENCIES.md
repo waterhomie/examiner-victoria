@@ -93,18 +93,24 @@ STT 服务端路径使用 OpenAI-compatible client 的 audio transcriptions 能�
 
 ## V3 TTS Provider 配置
 
-- CloudBase 生产路径使用腾讯云 TTS：`TTS_PROVIDER=tencent`。
+- OpenAI-compatible 路径复用现有 `API_KEY` 与 `BASE_URL`：`TTS_PROVIDER=openai_compatible`。
+- 腾讯云 TTS 继续保留为回滚路径：`TTS_PROVIDER=tencent`。
 - gTTS 仅作为显式本地 provider：`TTS_PROVIDER=gtts`。
 - 未配置 `TTS_PROVIDER` 时后端默认为 `disabled`，并保留文字降级；CloudBase 不得默认回退到 gTTS。
 - gTTS 在国内 CloudBase 出网链路中存在可达性和延迟风险。
 - TTS 失败不得影响已完成的 STT、LLM、文字反馈、下一题或 session state。
 - TTS admission 具备全局并发、单 session 并发、单 session 限流和有界排队超时，不自动重试。
 - Tencent Cloud TTS 使用官方 Python SDK 3.0 `TextToVoice` API；自动化测试仍只使用 mock。
+- OpenAI-compatible TTS 使用 Audio Speech API；自动化测试使用二进制 mock，不产生真实调用费用。
 - `VoiceType` 应先通过腾讯云控制台或 API Explorer 验证，再录入 CloudBase 环境变量。
 
 Runtime variable names:
 
 - `TTS_PROVIDER`
+- `TTS_MODEL`
+- `TTS_VOICE`
+- `TTS_RESPONSE_FORMAT`
+- `TTS_SPEED`
 - `TENCENTCLOUD_SECRET_ID`
 - `TENCENTCLOUD_SECRET_KEY`
 - `TENCENT_TTS_REGION`
@@ -122,6 +128,18 @@ Runtime variable names:
 - `TTS_TIMEOUT_SECONDS`
 
 Do not place Tencent Cloud credentials in GitHub, frontend `VITE_` variables, README, logs, or screenshots.
+
+OpenAI-compatible example (non-secret values only):
+
+```text
+TTS_PROVIDER=openai_compatible
+TTS_MODEL=tts-1
+TTS_VOICE=nova
+TTS_RESPONSE_FORMAT=mp3
+TTS_SPEED=1.0
+```
+
+This provider uses the existing server-side `API_KEY` and `BASE_URL`. Never add either value to frontend variables, logs, screenshots, or committed files. Provider model visibility does not by itself prove successful synthesis; perform one explicitly authorized minimal real call before switching production traffic.
 
 ## CloudBase 已验证配置与结果（2026-07-13）
 

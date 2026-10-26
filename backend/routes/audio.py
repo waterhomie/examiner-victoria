@@ -14,7 +14,7 @@ from ..core import config
 from ..audio_services import (
     TTSProviderError,
     get_safe_tts_error_log_fields,
-    get_tencent_tts_public_diagnostics,
+    get_tts_public_diagnostics,
     normalize_tts_provider_name,
 )
 from ..core.rate_limit import enforce_rate_limit
@@ -41,19 +41,19 @@ TTS_USER_FALLBACK_MESSAGE = "Voice is temporarily unavailable. Continue with the
 
 def _log_tts_failure(error: Exception, duration_ms: int) -> None:
     error_fields = get_safe_tts_error_log_fields(error)
-    tts_fields = get_tencent_tts_public_diagnostics()
+    tts_fields = get_tts_public_diagnostics()
     logger.warning(
         "TTS synthesis failed: error_code=%s error_message=%s request_id=%s "
-        "provider=%s tts_duration_ms=%s voice_type=%s region=%s codec=%s sample_rate=%s",
+        "provider=%s tts_duration_ms=%s model=%s voice=%s format=%s speed=%s",
         error_fields["error_code"],
         error_fields["error_message"],
         error_fields["request_id"],
         normalize_tts_provider_name(),
         duration_ms,
-        tts_fields["tts_voice_type"],
-        tts_fields["tts_region"],
-        tts_fields["tts_codec"],
-        tts_fields["tts_sample_rate"],
+        tts_fields["tts_model"],
+        tts_fields["tts_voice"],
+        tts_fields["tts_format"],
+        tts_fields["tts_speed"],
     )
 
 
@@ -229,17 +229,17 @@ async def tts(request_body: TTSRequest, request: Request) -> Response:
         _log_tts_failure(error, elapsed_ms)
         raise HTTPException(status_code=502, detail=TTS_USER_FALLBACK_MESSAGE) from error
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-    tts_fields = get_tencent_tts_public_diagnostics()
+    tts_fields = get_tts_public_diagnostics()
     logger.info(
         "TTS synthesis completed: provider=%s tts_duration_ms=%s request_id=%s "
-        "voice_type=%s region=%s codec=%s sample_rate=%s",
+        "model=%s voice=%s format=%s speed=%s",
         result.provider,
         elapsed_ms,
         result.request_id or "",
-        tts_fields["tts_voice_type"],
-        tts_fields["tts_region"],
-        tts_fields["tts_codec"],
-        tts_fields["tts_sample_rate"],
+        tts_fields["tts_model"],
+        tts_fields["tts_voice"],
+        tts_fields["tts_format"],
+        tts_fields["tts_speed"],
     )
     return Response(
         content=result.audio,

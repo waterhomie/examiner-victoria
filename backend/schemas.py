@@ -170,6 +170,10 @@ class RuntimeDiagnosticsResponse(BaseModel):
     tts_enabled: bool
     tts_provider: str
     tts_configured: bool
+    tts_model: str
+    tts_voice: str
+    tts_format: str
+    tts_speed: float
     tts_region: str
     tts_voice_type: str
     tts_codec: str

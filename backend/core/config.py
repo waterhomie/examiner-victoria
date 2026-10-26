@@ -57,6 +57,14 @@ def get_int(name: str, default: int) -> int:
         return default
 
 
+def get_float(name: str, default: float) -> float:
+    raw = get_secret(name, str(default))
+    try:
+        return float(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+
+
 def get_rate_limit_per_minute() -> int:
     raw = get_secret("RATE_LIMIT_PER_MINUTE", "120")
     try:
@@ -87,6 +95,10 @@ MODEL = get_secret("MODEL", "gpt-5.4-mini")
 TRANSCRIPTION_MODEL = get_secret("TRANSCRIPTION_MODEL", "whisper-1")
 TTS_CACHE_MAX_ITEMS = get_positive_int("TTS_CACHE_MAX_ITEMS", 64)
 TTS_PROVIDER = (get_secret("TTS_PROVIDER", "disabled") or "disabled").strip().lower()
+TTS_MODEL = (get_secret("TTS_MODEL", "tts-1") or "tts-1").strip()
+TTS_VOICE = (get_secret("TTS_VOICE", "nova") or "nova").strip()
+TTS_RESPONSE_FORMAT = (get_secret("TTS_RESPONSE_FORMAT", "mp3") or "mp3").strip().lower()
+TTS_SPEED = get_float("TTS_SPEED", 1.0)
 TENCENTCLOUD_SECRET_ID = (get_secret("TENCENTCLOUD_SECRET_ID", "") or "").strip()
 TENCENTCLOUD_SECRET_KEY = (get_secret("TENCENTCLOUD_SECRET_KEY", "") or "").strip()
 TENCENT_TTS_REGION = (get_secret("TENCENT_TTS_REGION", "ap-shanghai") or "").strip()

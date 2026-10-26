@@ -26,7 +26,7 @@ The GitHub repository was renamed from `waterhomie/examiner-victoria-v2` to `wat
 - direct-topic Part 1 practice with up to four non-duplicate questions
 - browser recording and server-side transcription
 - AI examiner questions and feedback
-- Tencent Cloud TTS on the CloudBase deployment
+- configurable OpenAI-compatible or Tencent Cloud TTS
 - text fallback when TTS is unavailable
 - reports, transcripts, practice records, export, and download
 - runtime/build diagnostics and a user-facing System check
@@ -61,7 +61,7 @@ Provider positioning:
 
 - LLM: existing OpenAI-compatible provider
 - STT: existing server transcription path, with browser capability checks and fallback behavior
-- TTS: Tencent Cloud TextToVoice through the official Python SDK on CloudBase
+- TTS: OpenAI-compatible Audio Speech API using the existing provider key, or Tencent Cloud TextToVoice as rollback
 - gTTS: explicit local/legacy provider only
 - voice degradation: written feedback and the next question remain available if TTS fails
 
