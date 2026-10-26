@@ -49,21 +49,13 @@ export function ChatPanel({
   retryLastRecording,
   shortScrollSlackRef,
 }) {
-  const [showPlaybackTip, setShowPlaybackTip] = useState(() => {
-    try { return window.localStorage.getItem("victoria-feedback-playback-tip") !== "seen"; }
-    catch { return true; }
-  });
-  const playback = feedbackPlayback ? { ...feedbackPlayback, onPlay: (text) => {
-    setShowPlaybackTip(false);
-    try { window.localStorage.setItem("victoria-feedback-playback-tip", "seen"); } catch { /* Optional hint only. */ }
-    feedbackPlayback.onPlay(text);
-  } } : null;
+  const playback = feedbackPlayback;
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
       <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
 
-      {showPlaybackTip && playback && messages.some((message) => message.role === "assistant" && /\*\*(Quick correction|Better expression|A natural version of your answer):/.test(message.content)) ? (
-        <p className="feedback-playback-hint" role="note">Tip: tap a correction or natural version to hear it. Tap again to stop.</p>
+      {playback && messages.some((message) => message.role === "assistant" && /\*\*(Quick correction|Better expression|A natural version of your answer):/.test(message.content)) ? (
+        <p className="feedback-playback-hint" role="note">Tip: tap a correction or natural version to hear Victoria. Tap again to stop.</p>
       ) : null}
 
       {messages.map((message, index) => (

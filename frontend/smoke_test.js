@@ -67,6 +67,13 @@ function assertProductMetadata() {
   assert.doesNotMatch(stageCardSource, /stage-pill|training-pill|Current practice summary/);
 }
 
+function assertPersistentFeedbackPlaybackHint() {
+  const chatPanelSource = readFileSync("./src/components/layout/ChatPanel.jsx", "utf8");
+  assert.match(chatPanelSource, /Tip: tap a correction or natural version to hear Victoria\. Tap again to stop\./);
+  assert.match(chatPanelSource, /playback && messages\.some\(/);
+  assert.doesNotMatch(chatPanelSource, /victoria-feedback-playback-tip|setShowPlaybackTip/);
+}
+
 function createSession(overrides = {}) {
   return {
     messages: [],
@@ -469,6 +476,7 @@ function assertChatBottomAnchorContracts() {
 await assertApiErrorMapping();
 await assertTtsFailureMapping();
 assertProductMetadata();
+assertPersistentFeedbackPlaybackHint();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
 assertMockModeSelectors();
