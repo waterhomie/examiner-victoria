@@ -151,6 +151,14 @@ class AdaptiveFeedbackTests(unittest.TestCase):
             "Sometimes we went fish and sometimes we travel around the village.",
             "Sometimes we went fishing and sometimes we travelled around the village.",
         ))
+        self.assertTrue(grounded_rewrite(
+            "There are many tall building near my home.",
+            "There are many tall buildings near my home.",
+        ))
+        self.assertTrue(grounded_rewrite(
+            "I like live in a low building because it is accessible.",
+            "I like living in a low building because it is accessible.",
+        ))
         # Even a relevant answer cannot acquire new numbers or an expanded life story.
         self.model.return_value = output(rewrite="I listen to music 7 times each morning and at night.")
         self.assertIsNone(coach_part1_answer(QUESTION, ANSWER, True).feedback[2])
@@ -178,7 +186,50 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.model.return_value = output(correction="NONE SUPPORT: guided", tip="NONE REASON: basic_language")
         result = coach_part1_answer(QUESTION, ANSWER, True)
         self.assertEqual(result.feedback[:3], (None, None, None))
-        self.assertEqual(build_reply(None, "Give one detail.", None, "Next?", merge_natural_version=True), "Next?")
+        self.assertEqual(
+            build_reply(None, "Give one detail.", None, "Next?", merge_natural_version=True),
+            "**Quick correction:** Give one detail.\n\nNext?",
+        )
+
+    def test_small_grounded_rewrites_and_tip_fallback_remain_visible(self):
+        cases = [
+            ("Are there many tall buildings?", "There are many tall building near my home.",
+             "There are many tall buildings near my home."),
+            ("Where would you like to live?", "I like live in a low building because it is accessible.",
+             "I like living in a low building because it is accessible."),
+        ]
+        for question, answer, rewrite in cases:
+            with self.subTest(question=question):
+                self.model.return_value = output(answer, rewrite=rewrite)
+                result = coach_part1_answer(question, answer, True)
+                self.assertEqual(result.feedback[2], rewrite)
+                reply = build_reply(*result.feedback[:3], "Next question?", merge_natural_version=True)
+                self.assertIn(f"**Natural version:** {rewrite}", reply)
+                self.assertNotIn("**Better expression:**", reply)
+                s = session()
+                s.current_question = question
+                _, message, _, _ = process_answer(s, answer)
+                self.assertIn(f"**Natural version:** {rewrite}", message.content)
+        self.model.return_value = output(tip='Say "it depends" instead of "it depend".')
+        result = coach_part1_answer(QUESTION, "It depend on my mood.", True)
+        reply = build_reply(*result.feedback[:3], "Next?", merge_natural_version=True)
+        self.assertIn('**Quick correction:** Say "it depends"', reply)
+        self.assertNotIn("**Better expression:**", reply)
+        self.assertNotIn("**Natural version:**", reply)
+        _, message, _, _ = process_answer(session(), "It depend on my mood.")
+        self.assertIn('**Quick correction:** Say "it depends"', message.content)
+        self.model.return_value = output(correction="NONE", tip="NONE", rewrite="NONE")
+        result = coach_part1_answer(QUESTION, ANSWER, True)
+        self.assertEqual(build_reply(*result.feedback[:3], "Next?", merge_natural_version=True), "Next?")
+
+    def test_correction_quote_matches_spoken_case_insensitively(self):
+        answer = "i like live in a low building"
+        self.model.return_value = output(
+            answer, correction='Say "like to live" instead of "like live".',
+            CORRECTION_QUOTE="I like live", CORRECTION_REPLACEMENT="I like to live",
+        )
+        result = coach_part1_answer(QUESTION, answer, True)
+        self.assertEqual(result.feedback[0], 'Say "I like to live" instead of "I like live".')
 
     def test_final_part1_answer_still_displays_correction(self):
         s = session()
@@ -329,7 +380,8 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.assertNotIn(ANSWER, stream.getvalue())
         self.assertIn("input_chars=", stream.getvalue())
         self.assertIn("model_rewrite=", stream.getvalue())
-        self.assertIn("shown_rewrite=", stream.getvalue())
+        self.assertIn("rewrite_state=", stream.getvalue())
+        self.assertIn("correction_source=", stream.getvalue())
         sizes = [sum(len(m["content"]) for m in messages) for messages, _ in captures]
         print(f"Synthetic feedback input chars (legacy/standard/adaptive-window5): {sizes}")
 
