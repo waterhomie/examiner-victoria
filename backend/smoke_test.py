@@ -201,7 +201,9 @@ def assert_feedback_availability_states(client: TestClient) -> None:
     try:
         def corrected_call_model(_messages: list[dict[str, str]], *_args, **_kwargs) -> str:
             return (
-                "CORRECTION: Use makes instead of make.\n"
+                "CORRECTION: Say \"makes\" instead of \"make\".\n"
+                "CORRECTION_QUOTE: make\n"
+                "CORRECTION_REPLACEMENT: makes\n"
                 "EXPRESSION_TIP: NONE\n"
                 "UPGRADED_ANSWER: NONE"
             )
