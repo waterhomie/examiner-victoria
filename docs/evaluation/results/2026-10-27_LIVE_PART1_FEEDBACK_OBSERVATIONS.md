@@ -51,3 +51,9 @@ The observations above were subsequently used to scope a focused Practice Part 1
 - The previously promised persistent playback hint was absent from the merged main commit of PR #37; it is included in this follow-up.
 
 Deterministic checks cover the redundant advice, grounded verb-form rewrite, merged display/playback, legacy playback, final-turn formatting, isolation and privacy. They do **not** prove that a live model will consistently identify every error. No paid provider calls, merge or deployment were part of this follow-up implementation.
+
+## Post-deployment regression observation
+
+After PR #38 was deployed, two further focused Part 1 turns about buildings showed only the next question despite visible spoken-language issues. The deployed version was confirmed by the product owner; this is not attributed to a stale deployment. Raw provider output was unavailable, so the exact model/filter decision for either turn remains unknown.
+
+The follow-up fix targets two deterministic suppression paths: a concrete model tip is no longer dropped merely because there is no full rewrite, and a small grounded grammatical rewrite is no longer discarded for being too similar to the original. The lexical guard now handles simple plural and verb-form variants. Privacy-safe log categories distinguish a model omission from a grounding or display guard without retaining answer or feedback text. Synthetic tests cover these paths and preserve the two visible feedback labels. This does not guarantee that a live model will find every error; real-provider retesting remains necessary.

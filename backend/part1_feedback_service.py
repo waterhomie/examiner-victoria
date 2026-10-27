@@ -88,9 +88,13 @@ def grounded_rewrite(answer: str, rewrite: str | None) -> bool:
         for word in tokens:
             if word in GRAMMAR_WORDS:
                 continue
-            root = re.sub(r"ies$", "y", word) if word.endswith("ies") else re.sub(r"(?:ing|ed|s)$", "", word)
+            # Peel plural and verb suffixes in sequence: buildings/building,
+            # surrounded/surrounding and live/living must compare equally.
+            root = re.sub(r"ies$", "y", word) if word.endswith("ies") else re.sub(r"s$", "", word)
+            root = re.sub(r"(?:ing|ed)$", "", root)
             if re.search(r"([^aeiou])\1$", root):
                 root = root[:-1]
+            root = {"liv": "live", "lik": "like", "giv": "give", "mak": "make"}.get(root, root)
             result.add({"enjoy": "like", "unwind": "relax", "guidance": "guide"}.get(root, root))
         return result
     return roots(original) == roots(words)
@@ -116,10 +120,12 @@ Content boundaries apply in every support state, including the final Part 1 answ
   preposition and pronoun reference. Correct the clearest real issue, if any.
 - At most ONE short anchored correction and ONE short concrete next step, never lists.
   Do not request a connector, reason, example or contrast already in the answer.
-  EXPRESSION_TIP is not a rewrite; avoid generic advice without a usable detail.
-- When useful, put ONE complete, natural, first-person rewrite in UPGRADED_ANSWER.
+  If a relevant answer has a clear spoken-language error, put its most useful fix in CORRECTION.
+  EXPRESSION_TIP is a fallback for a concrete action when CORRECTION is NONE; avoid generic advice.
+- When useful, put ONE complete, natural, first-person minimal-edit rewrite in UPGRADED_ANSWER.
+  Keep the learner's content words and facts; change only what is needed for natural grammar.
   It displays as Natural version. Only Quick correction and Natural version are visible feedback labels;
-  EXPRESSION_TIP is internal guidance and is not displayed by itself.
+  a useful EXPRESSION_TIP displays under Quick correction if there is no CORRECTION.
 - Do not correct capitalization, spelling, punctuation, names, or plausible STT homophones.
   If transcription is uncertain, acknowledge uncertainty; do not diagnose spoken grammar or acoustic fluency.
 - Do not infer pronunciation, intonation or an IELTS band from text, WPM, word count or input source.
@@ -158,7 +164,7 @@ ENABLE_UPGRADE: {'YES' if include_upgrade else 'NO'}
     quote, replacement = get("CORRECTION_QUOTE"), get("CORRECTION_REPLACEMENT")
     if quote or replacement:
         correction = (f'Say "{replacement}" instead of "{quote}".'
-                      if quote and quote in answer and len(quote) <= 80 and replacement
+                      if quote and quote.casefold() in answer.casefold() and len(quote) <= 80 and replacement
                       and len(replacement) <= 80 and not re.search(r"[;\n]|\b(?:also|and change)\b", replacement)
                       else None)
         correction = concise_focus(correction)
@@ -167,16 +173,29 @@ ENABLE_UPGRADE: {'YES' if include_upgrade else 'NO'}
         correction, tip, rewrite = None, SAFE_ACTIONS[kind], None
     if tip and correction and tip.lower() == correction.lower():
         tip = None
-    if not (include_upgrade and kind == "relevant" and get("GROUNDED") == "YES"
-            and len(answer) <= MAX_ANSWER_CHARS and grounded_rewrite(answer, rewrite)
-            and legacy.should_show_upgraded_answer(answer, rewrite, correction, tip)):
+    if not rewrite:
+        rewrite_state = "not_provided"
+    elif not include_upgrade:
+        rewrite_state = "disabled"
+    elif kind != "relevant":
+        rewrite_state = "answer_kind"
+    elif get("GROUNDED") != "YES":
+        rewrite_state = "model_not_grounded"
+    elif len(answer) > MAX_ANSWER_CHARS or not grounded_rewrite(answer, rewrite):
+        rewrite_state = "grounding_guard"
+    elif (legacy.normalize_spoken_text_for_similarity(answer)
+          == legacy.normalize_spoken_text_for_similarity(rewrite)):
+        rewrite_state = "unchanged"
+    else:
+        rewrite_state = "shown"
+    if rewrite_state != "shown":
         rewrite = None
     logger.info(
         "Part1 feedback outcome: adaptation=%s answer_kind=%s model_correction=%s model_tip=%s "
-        "model_rewrite=%s shown_correction=%s shown_rewrite=%s",
+        "model_rewrite=%s correction_source=%s rewrite_state=%s",
         "adaptive" if adaptive else "standard", kind,
         bool(raw_correction), bool(raw_tip), bool(raw_rewrite),
-        bool(correction), bool(rewrite),
+        "correction" if correction else "tip" if tip else "none", rewrite_state,
     )
     observation = None
     support, reason, evidence = get("SUPPORT"), get("REASON"), get("EVIDENCE")

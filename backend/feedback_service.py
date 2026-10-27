@@ -155,12 +155,16 @@ def build_reply(
     sections = []
     if not feedback_available:
         sections.append(FEEDBACK_UNAVAILABLE_MESSAGE)
-    if correction:
-        sections.append(f"**Quick correction:** {correction}")
     if merge_natural_version:
+        # Focused Part 1 has exactly two visible feedback labels. A concrete
+        # fallback action must not disappear when no full rewrite is safe.
+        if correction or expression_tip:
+            sections.append(f"**Quick correction:** {correction or expression_tip}")
         if upgraded_answer:
             sections.append(f"**Natural version:** {upgraded_answer}")
     else:
+        if correction:
+            sections.append(f"**Quick correction:** {correction}")
         if expression_tip:
             sections.append(f"**Better expression:** {expression_tip}")
         if upgraded_answer:
