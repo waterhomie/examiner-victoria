@@ -75,7 +75,8 @@ def process_answer(
         and session.answer_expansion_mode
         and phase in {"part1", "part2_followup", "part3"}
     )
-    if is_focused_part1(session):
+    focused_part1 = is_focused_part1(session)
+    if focused_part1:
         adaptive = session.feedback_adaptation == "adaptive"
         profile = session.learner_support_profile
         result = coach_part1_answer(previous_question, answer, include_upgrade,
@@ -120,7 +121,8 @@ def process_answer(
     else:
         session.current_question = next_content
 
-    reply = build_reply(correction, expression_tip, upgraded_answer, next_content, feedback_available)
+    reply = build_reply(correction, expression_tip, upgraded_answer, next_content,
+                        feedback_available, merge_natural_version=focused_part1)
     assistant_message = ChatMessage(role="assistant", content=reply, phase=session.phase,
                                     adaptation_notice=adaptation_notice)
     session.messages.append(assistant_message)

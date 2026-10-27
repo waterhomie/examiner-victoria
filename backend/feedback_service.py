@@ -150,16 +150,21 @@ def build_reply(
     upgraded_answer: str | None,
     next_content: str,
     feedback_available: bool = True,
+    merge_natural_version: bool = False,
 ) -> str:
     sections = []
     if not feedback_available:
         sections.append(FEEDBACK_UNAVAILABLE_MESSAGE)
     if correction:
         sections.append(f"**Quick correction:** {correction}")
-    if expression_tip:
-        sections.append(f"**Better expression:** {expression_tip}")
-    if upgraded_answer:
-        sections.append(f"**A natural version of your answer:**\n\n> {upgraded_answer}")
+    if merge_natural_version:
+        if upgraded_answer:
+            sections.append(f"**Natural version:** {upgraded_answer}")
+    else:
+        if expression_tip:
+            sections.append(f"**Better expression:** {expression_tip}")
+        if upgraded_answer:
+            sections.append(f"**A natural version of your answer:**\n\n> {upgraded_answer}")
     sections.append(next_content)
     return "\n\n".join(sections)
 

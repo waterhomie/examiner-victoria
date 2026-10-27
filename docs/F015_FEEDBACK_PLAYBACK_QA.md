@@ -32,3 +32,7 @@ Local implementation date: 2026-10-17. Branch: `feat/feedback-text-playback`.
 ## Later hosting review
 
 The owner reports long waits when opening the CloudBase deployment and wants to consider another host later. No hosting settings were changed in this task. A follow-up should measure initial document/static-resource load, health/session startup, STT, LLM and TTS timings separately before selecting a replacement. The current observation alone does not identify the bottleneck.
+
+## 2026-10-27 focused Part 1 follow-up
+
+The historical notes above describe F-015 at its initial implementation. Focused Practice Part 1 now uses only **Quick correction** and **Natural version** as visible feedback labels. A safe full rewrite appears under Natural version; without a safe rewrite, no separate expression tip is shown. Legacy Better expression and Natural version content in older sessions and other Practice parts remains playable. The playback hint stays visible when playable feedback is present, instead of being dismissed permanently after one tap. This follow-up changes neither automatic speech nor Mock presentation.
