@@ -139,7 +139,11 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         for mode, state in modes:
             with self.subTest(mode=mode, case="clear_grammar_error"):
                 profile = LearnerSupportProfile(state=state) if state is not None else None
-                self.model.return_value = output(answer, state=state or "unknown", correction=correction)
+                self.model.return_value = output(
+                    answer, state=state or "unknown", correction=correction,
+                    CORRECTION_QUOTE="there is many garden",
+                    CORRECTION_REPLACEMENT="there are many gardens",
+                )
                 result = coach_part1_answer(
                     "Are there many gardens near your city?",
                     answer, True, profile, source="text",
@@ -261,6 +265,14 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         )
         result = coach_part1_answer(QUESTION, answer, True)
         self.assertEqual(result.feedback[0], 'Say "I like to live" instead of "I like live".')
+        self.model.return_value = output(
+            answer, correction='Say "I like to live" instead of "I like live".'
+        )
+        result = coach_part1_answer(QUESTION, answer, True)
+        self.assertEqual(result.feedback[0], 'Say "I like to live" instead of "I like live".')
+        self.model.return_value = output(answer, correction='Use "I like to live" instead of "I like live".')
+        result = coach_part1_answer(QUESTION, answer, True)
+        self.assertEqual(result.feedback[0], 'Say "I like to live" instead of "I like live".')
 
     def test_text_is_not_misclassified_as_uncertain_transcript(self):
         answer = "I prefer keep a pet indoors."
@@ -305,19 +317,57 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.assertEqual(result.feedback[2], "I prefer to keep a pet indoors.")
         self.assertFalse(grounded_rewrite(answer, "I prefer to keep my pets indoors every morning."))
 
-    def test_final_part1_answer_still_displays_correction(self):
+    def test_favorite_is_not_rewritten_as_intent_to_visit(self):
+        answer = "My favorite park is Beijing Tiantan Park."
+        self.model.return_value = output(
+            answer, correction='Say "the park I want to visit is" instead of "my favorite park is".',
+            CORRECTION_QUOTE="my favorite park is",
+            CORRECTION_REPLACEMENT="the park I want to visit is",
+        )
+        result = coach_part1_answer("Is there a park you want to visit?", answer, True)
+        self.assertIsNone(result.feedback[0])
+        self.assertTrue(result.feedback[3])
+
+    def test_missing_anchor_uses_only_a_single_grounded_inflection(self):
+        answer = "Visiting parks elevates my mood and relax my body."
+        rewrite = "Visiting parks elevates my mood and relaxes my body."
+        self.model.return_value = output(answer, correction="Fix the verb form.", rewrite=rewrite)
+        result = coach_part1_answer(QUESTION, answer, True)
+        self.assertEqual(result.feedback[0], 'Say "relaxes" instead of "relax".')
+        self.assertEqual(result.feedback[2], rewrite)
+        self.model.return_value = output(
+            answer, correction="Fix the verb form.",
+            rewrite="Visiting parks helps me relax and elevates my mood.",
+        )
+        self.assertIsNone(coach_part1_answer(QUESTION, answer, True).feedback[0])
+        self.model.return_value = output(answer)
+        self.assertEqual(coach_part1_answer(QUESTION, answer, True).feedback[:3], (None, None, None))
+
+    def test_final_part1_answer_still_displays_relax_verb_correction(self):
         s = session()
         s.part1_index = len(s.part1_queue)
-        answer = "I would like to swim, but I cannot swim on water."
+        s.learner_support_profile.state = "guided"
+        answer = "Yes, I do. Visiting parks elevates my mood and relax my body."
         self.model.return_value = output(
-            answer, correction="Use in the water rather than on water.",
-            CORRECTION_QUOTE="on water", CORRECTION_REPLACEMENT="in the water",
+            answer, state="guided", correction='Say "relaxes" instead of "relax".',
+            CORRECTION_QUOTE="relax", CORRECTION_REPLACEMENT="relaxes",
         )
         _, message, spoken, _ = process_answer(s, answer)
+        self.assertEqual(self.model.call_count, 1)
         self.assertEqual(s.phase, "complete")
-        self.assertIn('**Quick correction:** Say "in the water" instead of "on water".', message.content)
+        self.assertIn('**Quick correction:** Say "relaxes" instead of "relax".', message.content)
         self.assertIn("end of Part 1 practice", message.content)
         self.assertIn("end of Part 1 practice", spoken)
+        without_anchor = session()
+        without_anchor.part1_index = len(without_anchor.part1_queue)
+        self.model.return_value = output(
+            answer, state="guided", correction="Fix the verb form.",
+            rewrite="Yes, I do. Visiting parks elevates my mood and relaxes my body.",
+        )
+        _, message, _, _ = process_answer(without_anchor, answer)
+        self.assertEqual(without_anchor.phase, "complete")
+        self.assertIn('**Quick correction:** Say "relaxes" instead of "relax".', message.content)
+        self.assertIn("end of Part 1 practice", message.content)
 
     def test_short_accurate_and_crossed_evidence(self):
         for answer, kind, state, expected in [
@@ -425,6 +475,51 @@ class AdaptiveFeedbackTests(unittest.TestCase):
             process_answer(s, ANSWER, source=source, duration=duration)
             profiles.append(s.learner_support_profile.observations[0].state)
         self.assertEqual(profiles, ["balanced"] * 3)
+
+    def test_outcome_logs_distinguish_none_parse_failure_and_local_filter(self):
+        import logging
+        answer = "My favorite park is Beijing Tiantan Park."
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        logger = logging.getLogger("uvicorn.error")
+        old_level = logger.level
+        logger.setLevel(logging.INFO)
+        logger.addHandler(handler)
+        try:
+            self.model.return_value = output(answer, state="guided")
+            coach_part1_answer(QUESTION, answer, True, LearnerSupportProfile(state="guided"), source="text")
+            none_log = stream.getvalue()
+            self.assertIn("support_state=guided", none_log)
+            self.assertIn("input_source=text", none_log)
+            self.assertIn("model_correction=none", none_log)
+            self.assertIn("correction_filter=model_none", none_log)
+
+            stream.seek(0)
+            stream.truncate(0)
+            self.model.return_value = "CORRECTION: NONE\nUPGRADED_ANSWER: NONE"
+            failed = coach_part1_answer(QUESTION, answer, True)
+            self.assertFalse(failed.feedback[3])
+            parse_log = stream.getvalue()
+            self.assertIn("outcome=field_parse_failed", parse_log)
+            self.assertIn("EXPRESSION_TIP:parse_failed", parse_log)
+
+            stream.seek(0)
+            stream.truncate(0)
+            self.model.return_value = output(
+                answer, correction='Say "the park I want to visit is" instead of "my favorite park is".',
+                CORRECTION_QUOTE="my favorite park is",
+                CORRECTION_REPLACEMENT="the park I want to visit is",
+            )
+            filtered = coach_part1_answer(QUESTION, answer, True)
+            self.assertIsNone(filtered.feedback[0])
+            filter_log = stream.getvalue()
+            self.assertIn("model_correction=present", filter_log)
+            self.assertIn("correction_filter=meaning_guard", filter_log)
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(old_level)
+        self.assertNotIn(answer, none_log + parse_log + filter_log)
+        self.assertNotIn("the park I want to visit", none_log + parse_log + filter_log)
 
     def test_call_budget_context_bounds_and_private_logs(self):
         import logging
