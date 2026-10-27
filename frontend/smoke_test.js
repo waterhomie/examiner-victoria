@@ -69,8 +69,10 @@ function assertProductMetadata() {
 
 function assertPersistentFeedbackPlaybackHint() {
   const chatPanelSource = readFileSync("./src/components/layout/ChatPanel.jsx", "utf8");
-  assert.match(chatPanelSource, /Tip: tap a correction or improved answer to hear Victoria\. Tap again to stop\./);
-  assert.match(chatPanelSource, /playback && messages\.some\(/);
+  assert.match(chatPanelSource, /Tip: tap feedback text to play Victoria's voice\. Tap again to stop\./);
+  assert.match(chatPanelSource, /messages\.map\(/);
+  assert.match(chatPanelSource, /splitFeedbackPlayback\(message\.content\)/);
+  assert.match(chatPanelSource, /Tap Quick correction or Natural version to play Victoria's voice/);
   assert.doesNotMatch(chatPanelSource, /victoria-feedback-playback-tip|setShowPlaybackTip/);
 }
 
