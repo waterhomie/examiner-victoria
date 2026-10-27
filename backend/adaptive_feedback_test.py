@@ -14,7 +14,7 @@ from .engine import process_answer
 from .exam_flow_service import start_session
 from .feedback_service import FEEDBACK_UNAVAILABLE_MESSAGE, build_reply, coach_spoken_answer
 from .learner_support_service import merge_observation, SUPPORT_GUIDANCE
-from .part1_feedback_service import coach_part1_answer, REASONS
+from .part1_feedback_service import coach_part1_answer, grounded_rewrite, REASONS
 from .report_service import build_fallback_report
 from .schemas import ExamSession, LearnerSupportProfile
 
@@ -143,6 +143,14 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.assertEqual(result.feedback[:3], (None, None, None))
         self.model.return_value = output(tip="Excellent answer!")
         self.assertIsNone(coach_part1_answer(QUESTION, ANSWER, True).feedback[1])
+        self.model.return_value = output(tip='Link the examples with "and".')
+        self.assertIsNone(coach_part1_answer(QUESTION, "I read and I swim.", True).feedback[1])
+        self.model.return_value = output(tip="Make the contrast clearer.")
+        self.assertIsNone(coach_part1_answer(QUESTION, ANSWER, True).feedback[1])
+        self.assertTrue(grounded_rewrite(
+            "Sometimes we went fish and sometimes we travel around the village.",
+            "Sometimes we went fishing and sometimes we travelled around the village.",
+        ))
         # Even a relevant answer cannot acquire new numbers or an expanded life story.
         self.model.return_value = output(rewrite="I listen to music 7 times each morning and at night.")
         self.assertIsNone(coach_part1_answer(QUESTION, ANSWER, True).feedback[2])
@@ -155,12 +163,36 @@ class AdaptiveFeedbackTests(unittest.TestCase):
             rewrite="I enjoy music because it makes me relax after school.")
         result = coach_part1_answer(QUESTION, answer, True, LearnerSupportProfile())
         self.assertIsNotNone(result.feedback[2])
-        reply = build_reply(*result.feedback[:3], "Next question?")
-        self.assertIn("**A natural version of your answer:**\n\n> ", reply)
+        reply = build_reply(*result.feedback[:3], "Next question?", merge_natural_version=True)
+        self.assertIn("**Natural version:** I enjoy music", reply)
+        self.assertNotIn("**Better expression:**", reply)
+        self.assertNotIn("**Next step:**", reply)
+        self.assertNotIn("A natural version of your answer", reply)
+        self.assertIn("**A natural version of your answer:**", build_reply(*result.feedback[:3], "Next?"))
         self.assertNotIn("SUPPORT:", reply)
+        _, message, _, _ = process_answer(session(), answer)
+        self.assertIn("**Natural version:** I enjoy music", message.content)
+        self.assertNotIn("**Better expression:**", message.content)
+        self.assertNotIn("**Next step:**", message.content)
+        self.assertNotIn("A natural version of your answer", message.content)
         self.model.return_value = output(correction="NONE SUPPORT: guided", tip="NONE REASON: basic_language")
         result = coach_part1_answer(QUESTION, ANSWER, True)
         self.assertEqual(result.feedback[:3], (None, None, None))
+        self.assertEqual(build_reply(None, "Give one detail.", None, "Next?", merge_natural_version=True), "Next?")
+
+    def test_final_part1_answer_still_displays_correction(self):
+        s = session()
+        s.part1_index = len(s.part1_queue)
+        answer = "I would like to swim, but I cannot swim on water."
+        self.model.return_value = output(
+            answer, correction="Use in the water rather than on water.",
+            CORRECTION_QUOTE="on water", CORRECTION_REPLACEMENT="in the water",
+        )
+        _, message, spoken, _ = process_answer(s, answer)
+        self.assertEqual(s.phase, "complete")
+        self.assertIn('**Quick correction:** Say "in the water" instead of "on water".', message.content)
+        self.assertIn("end of Part 1 practice", message.content)
+        self.assertIn("end of Part 1 practice", spoken)
 
     def test_short_accurate_and_crossed_evidence(self):
         for answer, kind, state, expected in [
@@ -296,6 +328,8 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.assertEqual(captures[-1][0][0]["content"].count('"support": "balanced"'), 5)
         self.assertNotIn(ANSWER, stream.getvalue())
         self.assertIn("input_chars=", stream.getvalue())
+        self.assertIn("model_rewrite=", stream.getvalue())
+        self.assertIn("shown_rewrite=", stream.getvalue())
         sizes = [sum(len(m["content"]) for m in messages) for messages, _ in captures]
         print(f"Synthetic feedback input chars (legacy/standard/adaptive-window5): {sizes}")
 

@@ -12,7 +12,7 @@ const session = { session_id: "synthetic-adaptive", phase: "part1", practice_mod
   practice_type: "part1", current_question: "When do you listen?", feedback_adaptation: "adaptive",
   learner_support_profile: profile, candidate_answers: [{ phase: "part1", question: "Do you like music?", answer: "Yes, I like jazz." }],
   messages: [{ role: "assistant", adaptation_notice: true,
-    content: "**A natural version of your answer:**\n\n> Jazz is my favourite kind of music.\n\nWhen do you listen?" }] };
+    content: "**Natural version:** Jazz is my favourite kind of music.\n\nWhen do you listen?" }] };
 const original = JSON.stringify(session);
 let state = appReducer(createInitialAppState(), sessionRestored({ session }));
 assert.equal(state.feedbackAdaptation, "adaptive");
@@ -53,7 +53,7 @@ const fresh = { ...session, learner_support_profile: { version: 1, state: "unkno
   feedback_adaptation: "standard", candidate_answers: [], messages: [] };
 assert.deepEqual(appReducer(state, sessionStartSucceeded(fresh)).session.learner_support_profile.observations, []);
 
-// F-015 still extracts only the Natural version body; metadata never enters exports.
+// F-015 extracts only the merged Natural version body; metadata never enters exports.
 const sections = splitFeedbackPlayback(session.messages[0].content);
 assert.deepEqual(sections.filter((item) => item.text).map((item) => item.text), ["Jazz is my favourite kind of music."]);
 for (const exported of [buildTranscriptText(session), buildPracticeRecordText(session, "")]) {

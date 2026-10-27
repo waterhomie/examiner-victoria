@@ -54,6 +54,22 @@ def concise_focus(value: str | None) -> str | None:
     return first if len(first) <= MAX_FEEDBACK_CHARS else None
 
 
+def useful_expression_tip(answer: str, tip: str | None) -> str | None:
+    tip = concise_focus(tip)
+    if not tip:
+        return None
+    if re.search(r"\b(?:because|for example|for instance)\b", answer, re.I) and re.search(
+        r"\b(?:add|give|include)\b.*\b(?:reason|example)\b", tip, re.I
+    ):
+        return None
+    connector_advice = re.search(r"\b(?:link|connect|join)\b.*\b(and|but|because)\b", tip, re.I)
+    if connector_advice and re.search(rf"\b{connector_advice.group(1)}\b", answer, re.I):
+        return None
+    if re.match(r"(?:make|be|improve|clarify)\b", tip, re.I) and not re.search(r'["“”`?]', tip):
+        return None
+    return tip
+
+
 def grounded_rewrite(answer: str, rewrite: str | None) -> bool:
     if not rewrite or re.search(INTERNAL_MARKERS, rewrite, re.I):
         return False
@@ -73,7 +89,9 @@ def grounded_rewrite(answer: str, rewrite: str | None) -> bool:
             if word in GRAMMAR_WORDS:
                 continue
             root = re.sub(r"ies$", "y", word) if word.endswith("ies") else re.sub(r"(?:ing|ed|s)$", "", word)
-            result.add({"enjoy": "like", "unwind": "relax"}.get(root, root))
+            if re.search(r"([^aeiou])\1$", root):
+                root = root[:-1]
+            result.add({"enjoy": "like", "unwind": "relax", "guidance": "guide"}.get(root, root))
         return result
     return roots(original) == roots(words)
 
@@ -93,10 +111,15 @@ Use NONE when there is no useful change. Preserve these labels for existing clie
 Also return ANSWER_KIND (relevant/off_topic/insufficient/transcript_uncertain/clarification/instruction/system_copy),
 GROUNDED (YES/NO: every rewritten fact is already in the original answer).
 {('Also return SUPPORT (guided/balanced/refinement/unknown), REASON (basic_language/clear_language/precise_language/none), and EVIDENCE (one exact excerpt of the original answer, or NONE).' if adaptive else 'Do not classify a support state.' )}
-Content boundaries apply in every support state:
-- Check whether a reason, example or contrast ALREADY exists before requesting one.
-- At most ONE main correction and ONE distinct expression tip, each one short sentence, no lists.
-  Quote the specific original phrase when correcting it. Long answers get no extra correction budget.
+Content boundaries apply in every support state, including the final Part 1 answer:
+- Before all NONE for a relevant answer, check spoken verb form, tense, word choice,
+  preposition and pronoun reference. Correct the clearest real issue, if any.
+- At most ONE short anchored correction and ONE short concrete next step, never lists.
+  Do not request a connector, reason, example or contrast already in the answer.
+  EXPRESSION_TIP is not a rewrite; avoid generic advice without a usable detail.
+- When useful, put ONE complete, natural, first-person rewrite in UPGRADED_ANSWER.
+  It displays as Natural version. Only Quick correction and Natural version are visible feedback labels;
+  EXPRESSION_TIP is internal guidance and is not displayed by itself.
 - Do not correct capitalization, spelling, punctuation, names, or plausible STT homophones.
   If transcription is uncertain, acknowledge uncertainty; do not diagnose spoken grammar or acoustic fluency.
 - Do not infer pronunciation, intonation or an IELTS band from text, WPM, word count or input source.
@@ -130,7 +153,8 @@ ENABLE_UPGRADE: {'YES' if include_upgrade else 'NO'}
     get = lambda label: legacy.extract_feedback_field(result, label)
     kind = "system_copy" if system_copy else local_answer_kind(answer) or get("ANSWER_KIND")
     kind = kind if kind in VALID_KINDS else "unknown"
-    correction, tip = concise_focus(get("CORRECTION")), concise_focus(get("EXPRESSION_TIP"))
+    raw_correction, raw_tip, raw_rewrite = get("CORRECTION"), get("EXPRESSION_TIP"), get("UPGRADED_ANSWER")
+    correction, tip = concise_focus(raw_correction), useful_expression_tip(answer, raw_tip)
     quote, replacement = get("CORRECTION_QUOTE"), get("CORRECTION_REPLACEMENT")
     if quote or replacement:
         correction = (f'Say "{replacement}" instead of "{quote}".'
@@ -138,18 +162,22 @@ ENABLE_UPGRADE: {'YES' if include_upgrade else 'NO'}
                       and len(replacement) <= 80 and not re.search(r"[;\n]|\b(?:also|and change)\b", replacement)
                       else None)
         correction = concise_focus(correction)
-    raw_rewrite = get("UPGRADED_ANSWER")
     rewrite = re.sub(r"\s+", " ", raw_rewrite).strip() if raw_rewrite else None
     if kind in SAFE_ACTIONS:
         correction, tip, rewrite = None, SAFE_ACTIONS[kind], None
     if tip and correction and tip.lower() == correction.lower():
         tip = None
-    if tip and re.search(r"\b(?:because|for example|for instance)\b", answer, re.I) and re.search(r"\b(?:add|give|include)\b.*\b(?:reason|example)\b", tip, re.I):
-        tip = None
     if not (include_upgrade and kind == "relevant" and get("GROUNDED") == "YES"
             and len(answer) <= MAX_ANSWER_CHARS and grounded_rewrite(answer, rewrite)
             and legacy.should_show_upgraded_answer(answer, rewrite, correction, tip)):
         rewrite = None
+    logger.info(
+        "Part1 feedback outcome: adaptation=%s answer_kind=%s model_correction=%s model_tip=%s "
+        "model_rewrite=%s shown_correction=%s shown_rewrite=%s",
+        "adaptive" if adaptive else "standard", kind,
+        bool(raw_correction), bool(raw_tip), bool(raw_rewrite),
+        bool(correction), bool(rewrite),
+    )
     observation = None
     support, reason, evidence = get("SUPPORT"), get("REASON"), get("EVIDENCE")
     if (adaptive and kind == "relevant" and support in REASONS and REASONS[support] == reason

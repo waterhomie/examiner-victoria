@@ -4,7 +4,7 @@ export function splitFeedbackPlayback(content) {
   const sections = [];
   for (let index = 0; index < paragraphs.length; index += 1) {
     const paragraph = paragraphs[index];
-    const inline = paragraph.match(/^\*\*(Quick correction|Better expression):\*\*\s*(.+)$/s);
+    const inline = paragraph.match(/^\*\*(Quick correction|Better expression|Natural version):\*\*\s*(.+)$/s);
     const natural = /^\*\*A natural version of your answer:\*\*\s*$/.test(paragraph.trim());
     if (inline) {
       sections.push({ content: paragraph, text: cleanSpeechText(inline[2]), label: inline[1] });

@@ -10,4 +10,7 @@ assert.equal(sections.map((section) => section.content).join('\n\n'), content);
 assert.equal(splitFeedbackPlayback('What do you study?').some((section) => section.text), false);
 assert.equal(splitFeedbackPlayback('**A natural version of your answer:**\n\nNext question?').some((section) => section.text), false);
 assert.deepEqual(splitFeedbackPlayback('**Quick correction:** Fine.\r\n\r\nNext?').map((section) => section.text), ['Fine.', '']);
+const merged = splitFeedbackPlayback('**Quick correction:** Say "went fishing".\n\n**Natural version:** Sometimes we went fishing together.\n\nNext question?');
+assert.deepEqual(merged.filter((section) => section.text).map((section) => section.label), ['Quick correction', 'Natural version']);
+assert.equal(merged.find((section) => section.label === 'Natural version').text, 'Sometimes we went fishing together.');
 console.log('Feedback playback parsing checks passed.');

@@ -20,13 +20,14 @@ try {
   }
   const disabled = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, recording: true }));
   assert.match(disabled, /data-testid="adaptive-feedback-toggle"[^>]*disabled/);
-  const content = "**A natural version of your answer:**\n\n> I enjoy jazz.\n\nWhen do you listen?";
+  const content = "**Natural version:** I enjoy jazz because it helps me relax.\n\nWhen do you listen?";
   const html = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content, adaptation_notice: true }, { role: "assistant", content }],
     feedbackPlayback: { text: "", status: "", onPlay() {} },
   }));
   assert.equal((html.match(/This is not an IELTS level assessment/g) || []).length, 1);
   assert.equal((html.match(/aria-label="Play Natural version"/g) || []).length, 2);
+  assert.match(html, /tap a correction or improved answer to hear Victoria/);
   assert.doesNotMatch(html, /learner_support_profile|SUPPORT:|EVIDENCE:/);
   console.log("Adaptive feedback rendered settings, notice and F-015 controls passed.");
 } finally {
