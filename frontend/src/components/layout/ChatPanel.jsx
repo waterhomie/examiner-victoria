@@ -54,7 +54,7 @@ export function ChatPanel({
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
       <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
 
-      {playback && messages.length > 0 ? <p className="feedback-playback-hint" role="note">
+      {playback && messages.length > 0 && !messages.some((message) => message.adaptation_notice) ? <p className="feedback-playback-hint" role="note">
         Tip: tap feedback text to play Victoria's voice. Tap again to stop.
       </p> : null}
 
@@ -62,6 +62,7 @@ export function ChatPanel({
         <Fragment key={`${message.role}-${index}`}>
           {message.adaptation_notice ? <p className="feedback-playback-hint" role="note">
             Feedback adjusts to your answers in this session. This is not an IELTS level assessment.
+            {playback ? " Tip: tap Quick correction or Natural version to play Victoria's voice. Tap again to stop." : null}
           </p> : null}
           <MessageBubble message={message} feedbackPlayback={playback} />
         </Fragment>
