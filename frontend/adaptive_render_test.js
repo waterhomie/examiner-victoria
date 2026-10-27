@@ -27,7 +27,17 @@ try {
   }));
   assert.equal((html.match(/This is not an IELTS level assessment/g) || []).length, 1);
   assert.equal((html.match(/aria-label="Play Natural version"/g) || []).length, 2);
-  assert.match(html, /tap a correction or improved answer to hear Victoria/);
+  assert.match(html, /Tap Quick correction or Natural version to play Victoria&#x27;s voice/);
+  assert.equal((html.match(/Tap Quick correction or Natural version to play/g) || []).length, 1);
+  assert.equal((html.match(/Tip: tap feedback text/g) || []).length, 1);
+  const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
+    messages: [{ role: "assistant", content: "First question?" },
+      { role: "assistant", content: "**Quick correction:** Say 'I agree'.\n\nNext question?" }],
+    feedbackPlayback: { text: "", status: "", onPlay() {} },
+  }));
+  assert.match(standardHtml, /Tip: tap feedback text to play Victoria&#x27;s voice/);
+  assert.ok(standardHtml.indexOf("First question?") < standardHtml.indexOf("Tip: tap feedback text"));
+  assert.ok(standardHtml.indexOf("Tip: tap feedback text") < standardHtml.indexOf("Play Quick correction"));
   assert.doesNotMatch(html, /learner_support_profile|SUPPORT:|EVIDENCE:/);
   console.log("Adaptive feedback rendered settings, notice and F-015 controls passed.");
 } finally {

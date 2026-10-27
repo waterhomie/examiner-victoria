@@ -80,7 +80,7 @@ def process_answer(
         adaptive = session.feedback_adaptation == "adaptive"
         profile = session.learner_support_profile
         result = coach_part1_answer(previous_question, answer, include_upgrade,
-                                    profile if adaptive else None, is_system_rewrite(session, answer))
+                                    profile if adaptive else None, is_system_rewrite(session, answer), source)
         correction, expression_tip, upgraded_answer, feedback_available = result.feedback
         if adaptive:
             repeated = any(item.question == previous_question and item.answer.strip() == answer.strip()

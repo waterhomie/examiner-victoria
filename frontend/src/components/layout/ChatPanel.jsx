@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
+import { splitFeedbackPlayback } from "../../utils/feedbackPlayback.js";
 
 function MockExamCard({ mockExam, onReplayQuestion }) {
   if (!mockExam) return null;
@@ -54,14 +55,15 @@ export function ChatPanel({
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
       <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
 
-      {playback && messages.some((message) => message.role === "assistant" && /\*\*(Quick correction|Better expression|Natural version|A natural version of your answer):/.test(message.content)) ? (
-        <p className="feedback-playback-hint" role="note">Tip: tap a correction or improved answer to hear Victoria. Tap again to stop.</p>
-      ) : null}
-
       {messages.map((message, index) => (
         <Fragment key={`${message.role}-${index}`}>
           {message.adaptation_notice ? <p className="feedback-playback-hint" role="note">
             Feedback adjusts to your answers in this session. This is not an IELTS level assessment.
+            {playback ? " Tap Quick correction or Natural version to play Victoria's voice; tap again to stop." : null}
+          </p> : null}
+          {playback && message.role === "assistant" && !message.adaptation_notice
+              && splitFeedbackPlayback(message.content).some((section) => section.text) ? <p className="feedback-playback-hint" role="note">
+            Tip: tap feedback text to play Victoria's voice. Tap again to stop.
           </p> : null}
           <MessageBubble message={message} feedbackPlayback={playback} />
         </Fragment>
