@@ -73,7 +73,9 @@ export function selectSessionView(state) {
   const isPracticeMode = selectIsPracticeMode(state);
   const sessionStats = getSessionStats(state.session);
   const stageProgress = getStageProgress(state.session?.phase);
-  const showPart1TopicSelect = shouldShowPart1TopicSelect(state.practiceType, state.practiceOptions);
+  const hasAnsweredPart1 = Boolean(state.session?.candidate_answers?.some((answer) => answer.phase === "part1"));
+  const showPart1TopicSelect = !hasAnsweredPart1
+    && shouldShowPart1TopicSelect(state.practiceType, state.practiceOptions);
   const showCueCardSelect = shouldShowCueCardSelect(state.practiceType, state.practiceOptions);
   const hasVisibleStageControls = hasStageControls({
     prepRemaining,
