@@ -286,7 +286,7 @@ class AdaptiveFeedbackTests(unittest.TestCase):
                 s = session()
                 _, message, _, _ = process_answer(s, answer, source=source)
                 self.assertIn("**Quick correction:**", message.content)
-                self.assertIn("**Natural version:** I prefer to keep a pet indoors.", message.content)
+                self.assertNotIn("**Natural version:**", message.content)
                 self.assertNotIn("transcript may be inaccurate", message.content.lower())
                 self.assertEqual(s.learner_support_profile.observations, [])
                 self.assertIn(f'"source": "{source}"', self.model.call_args.args[0][1]["content"])
@@ -307,14 +307,15 @@ class AdaptiveFeedbackTests(unittest.TestCase):
             "I prefer keep a pet indoors.", "I prefer to keep a pet indoors every morning.",
         ))
 
-    def test_natural_version_can_use_a_grounded_inline_correction(self):
+    def test_local_correction_does_not_pretend_to_be_a_complete_natural_version(self):
         answer = "I prefer keep a pet indoors."
         self.model.return_value = output(
             answer, correction='Say "prefer to keep" instead of "prefer keep".',
             rewrite="I prefer to keep my pets indoors every morning.",
         )
         result = coach_part1_answer(QUESTION, answer, True)
-        self.assertEqual(result.feedback[2], "I prefer to keep a pet indoors.")
+        self.assertEqual(result.feedback[0], 'Say "prefer to keep" instead of "prefer keep".')
+        self.assertIsNone(result.feedback[2])
         self.assertFalse(grounded_rewrite(answer, "I prefer to keep my pets indoors every morning."))
 
     def test_favorite_is_not_rewritten_as_intent_to_visit(self):
@@ -343,6 +344,57 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.model.return_value = output(answer)
         self.assertEqual(coach_part1_answer(QUESTION, answer, True).feedback[:3], (None, None, None))
 
+    def test_rejected_rewrite_can_still_yield_one_safe_verb_form_fix(self):
+        answer = "Walking outside relax my body after work."
+        unsafe_rewrite = "Walking outside relaxes my body after work every morning."
+        self.model.return_value = output(
+            answer, correction="Fix the verb form.", rewrite=unsafe_rewrite,
+        )
+        result = coach_part1_answer(QUESTION, answer, True)
+        self.assertEqual(result.feedback[0], 'Say "relaxes" instead of "relax".')
+        self.assertIsNone(result.feedback[2])
+        self.model.return_value = output(
+            answer, correction="Fix the verb form.",
+            rewrite="Walking outside makes me feel happy every morning.",
+        )
+        self.assertEqual(coach_part1_answer(QUESTION, answer, True).feedback[:3],
+                         (None, None, None))
+        repeated = "I work during the week and work after dinner."
+        self.model.return_value = output(
+            repeated, correction="Fix the verb form.",
+            rewrite="I work during the week and works after dinner every morning.",
+        )
+        self.assertIsNone(coach_part1_answer(QUESTION, repeated, True).feedback[0])
+
+    def test_grounding_reasons_are_categorical_and_private(self):
+        import logging
+        answer = "I sometimes visit parks with friends."
+        cases = (
+            ("I always visit parks with friends.", "qualifiers"),
+            ("I sometimes visit parks with friends every day.", "qualifiers"),
+            ("I sometimes visit parks with friends and dogs.", "content_roots"),
+            ("I sometimes visit 3 parks with friends.", "numbers"),
+        )
+        stream = io.StringIO()
+        handler = logging.StreamHandler(stream)
+        logger = logging.getLogger("uvicorn.error")
+        old_level = logger.level
+        logger.setLevel(logging.INFO)
+        logger.addHandler(handler)
+        try:
+            for rewrite, reason in cases:
+                stream.seek(0)
+                stream.truncate(0)
+                self.model.return_value = output(answer, rewrite=rewrite)
+                result = coach_part1_answer(QUESTION, answer, True)
+                self.assertIsNone(result.feedback[2])
+                self.assertIn(f"rewrite_guard={reason}", stream.getvalue())
+                self.assertNotIn(answer, stream.getvalue())
+                self.assertNotIn(rewrite, stream.getvalue())
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(old_level)
+
     def test_final_part1_answer_still_displays_relax_verb_correction(self):
         s = session()
         s.part1_index = len(s.part1_queue)
@@ -367,6 +419,17 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         _, message, _, _ = process_answer(without_anchor, answer)
         self.assertEqual(without_anchor.phase, "complete")
         self.assertIn('**Quick correction:** Say "relaxes" instead of "relax".', message.content)
+        self.assertIn("end of Part 1 practice", message.content)
+        rejected_rewrite = session()
+        rejected_rewrite.part1_index = len(rejected_rewrite.part1_queue)
+        self.model.return_value = output(
+            answer, state="guided", correction="Fix the verb form.",
+            rewrite="Yes, I do. Visiting parks elevates my mood and relaxes my body every morning.",
+        )
+        _, message, _, _ = process_answer(rejected_rewrite, answer)
+        self.assertEqual(rejected_rewrite.phase, "complete")
+        self.assertIn('**Quick correction:** Say "relaxes" instead of "relax".', message.content)
+        self.assertNotIn("**Natural version:**", message.content)
         self.assertIn("end of Part 1 practice", message.content)
 
     def test_short_accurate_and_crossed_evidence(self):
@@ -515,6 +578,7 @@ class AdaptiveFeedbackTests(unittest.TestCase):
             filter_log = stream.getvalue()
             self.assertIn("model_correction=present", filter_log)
             self.assertIn("correction_filter=meaning_guard", filter_log)
+            self.assertIn("correction_guard=content_roots", filter_log)
         finally:
             logger.removeHandler(handler)
             logger.setLevel(old_level)

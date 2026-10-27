@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import json
 import logging
 import re
@@ -94,47 +95,49 @@ def _content_roots(tokens: list[str]) -> tuple[str, ...]:
     return tuple(roots)
 
 
-def grounded_rewrite(answer: str, rewrite: str | None) -> bool:
-    if not rewrite or re.search(INTERNAL_MARKERS, rewrite, re.I):
-        return False
+def rewrite_guard_reason(answer: str, rewrite: str | None) -> str | None:
+    if not rewrite:
+        return "missing"
+    if re.search(INTERNAL_MARKERS, rewrite, re.I):
+        return "internal_marker"
     original = legacy.normalize_spoken_text_for_similarity(answer).split()
     words = legacy.normalize_spoken_text_for_similarity(rewrite).split()
     if not original or len(words) > len(original) * 1.35 + 3:
-        return False
+        return "length"
     if set(re.findall(r"\d+", rewrite)) != set(re.findall(r"\d+", answer)):
-        return False
+        return "numbers"
     if set(original) & FACT_QUALIFIERS != set(words) & FACT_QUALIFIERS:
-        return False
-    # Natural versions retain the existing conservative content-word set check.
-    return set(_content_roots(original)) == set(_content_roots(words))
+        return "qualifiers"
+    if set(_content_roots(original)) != set(_content_roots(words)):
+        return "content_roots"
+    return None
 
 
-def _correction_preserves_meaning(answer: str, candidate: str) -> bool:
-    original = legacy.normalize_spoken_text_for_similarity(answer).split()
-    words = legacy.normalize_spoken_text_for_similarity(candidate).split()
-    return (
-        tuple(word for word in original if word in FACT_QUALIFIERS)
-        == tuple(word for word in words if word in FACT_QUALIFIERS)
-        and _content_roots(original) == _content_roots(words)
-    )
+def grounded_rewrite(answer: str, rewrite: str | None) -> bool:
+    return rewrite_guard_reason(answer, rewrite) is None
 
 
 def correction_from_single_inflection(answer: str, rewrite: str) -> str | None:
-    if not grounded_rewrite(answer, rewrite) or not _correction_preserves_meaning(answer, rewrite):
+    if re.search(INTERNAL_MARKERS, rewrite, re.I):
         return None
     original = legacy.normalize_spoken_text_for_similarity(answer).split()
     updated = legacy.normalize_spoken_text_for_similarity(rewrite).split()
-    if len(original) != len(updated):
-        return None
-    changes = [(before, after) for before, after in zip(original, updated) if before != after]
-    if len(changes) != 1:
-        return None
-    before, after = changes[0]
-    if before in GRAMMAR_WORDS or after in GRAMMAR_WORDS:
-        return None
-    if _content_roots([before]) != _content_roots([after]):
-        return None
-    return f'Say "{after}" instead of "{before}".'
+    for tag, start, end, new_start, new_end in SequenceMatcher(
+            None, original, updated, autojunk=False).get_opcodes():
+        if tag != "replace" or end - start != 1 or new_end - new_start != 1:
+            continue
+        before, after = original[start], updated[new_start]
+        if (len(before) < 4 or len(after) < 4 or original.count(before) != 1
+                or before in GRAMMAR_WORDS or after in GRAMMAR_WORDS
+                or _content_roots([before]) != _content_roots([after])):
+            continue
+        # Restrict this fallback to morphology; synonyms and paraphrases are not corrections.
+        if not (before.startswith(after[:3]) or after.startswith(before[:3])):
+            continue
+        candidate = grounded_correction_candidate(answer, before, after)
+        if candidate:
+            return f'Say "{after}" instead of "{before}".'
+    return None
 
 
 def feedback_field_state(result: str, label: str) -> str:
@@ -163,12 +166,8 @@ def correction_text_anchors(correction: str | None) -> tuple[str, str] | None:
     return None
 
 
-def rewrite_from_grounded_correction(answer: str, quote: str | None, replacement: str | None,
-                                      correction: str | None = None) -> str | None:
-    if (not quote or not replacement) and correction:
-        anchors = correction_text_anchors(correction)
-        if anchors:
-            quote, replacement = anchors
+def grounded_correction_candidate(answer: str, quote: str | None,
+                                  replacement: str | None) -> str | None:
     if not quote or not replacement or len(quote) > 80 or len(replacement) > 80:
         return None
     if re.search(r"[;\n]|\b(?:also|and change)\b", replacement, re.I):
@@ -177,12 +176,25 @@ def rewrite_from_grounded_correction(answer: str, quote: str | None, replacement
     if not match:
         return None
     candidate = f"{answer[:match.start()]}{replacement}{answer[match.end():]}".strip()
-    if (not grounded_rewrite(answer, candidate)
-            or not _correction_preserves_meaning(answer, candidate)
-            or legacy.normalize_spoken_text_for_similarity(answer)
-            == legacy.normalize_spoken_text_for_similarity(candidate)):
+    if correction_guard_reason(answer, candidate):
         return None
     return candidate
+
+
+def correction_guard_reason(answer: str, candidate: str) -> str | None:
+    reason = rewrite_guard_reason(answer, candidate)
+    if reason:
+        return reason
+    original = legacy.normalize_spoken_text_for_similarity(answer).split()
+    words = legacy.normalize_spoken_text_for_similarity(candidate).split()
+    if tuple(word for word in original if word in FACT_QUALIFIERS) != tuple(
+            word for word in words if word in FACT_QUALIFIERS):
+        return "qualifier_order"
+    if _content_roots(original) != _content_roots(words):
+        return "content_order"
+    if original == words:
+        return "unchanged"
+    return None
 
 
 def coach_part1_answer(question: str, answer: str, include_upgrade: bool,
@@ -277,37 +289,48 @@ INPUT_SOURCE: {source}
     raw_correction, raw_tip, raw_rewrite = get("CORRECTION"), get("EXPRESSION_TIP"), get("UPGRADED_ANSWER")
     quote, replacement = get("CORRECTION_QUOTE"), get("CORRECTION_REPLACEMENT")
     correction = None
+    correction_guard = "not_checked"
     if raw_correction is None:
         correction_filter = "model_none"
     elif concise_focus(raw_correction) is None:
         correction_filter = "local_text_filter"
     else:
         field_candidate = (
-            rewrite_from_grounded_correction(answer, quote, replacement)
+            grounded_correction_candidate(answer, quote, replacement)
             if quote and replacement else None
         )
         text_anchors = correction_text_anchors(raw_correction)
         text_candidate = (
-            rewrite_from_grounded_correction(answer, *text_anchors)
+            grounded_correction_candidate(answer, *text_anchors)
             if text_anchors else None
         )
         if field_candidate is not None:
             correction = f'Say "{replacement}" instead of "{quote}".'
             correction_filter = "shown"
+            correction_guard = "passed"
         elif text_candidate is not None and text_anchors is not None:
             quote, replacement = text_anchors
             correction = f'Say "{replacement}" instead of "{quote}".'
             correction_filter = "text_anchor_fallback"
-        elif text_anchors is not None:
-            correction_filter = "meaning_guard"
-        elif not quote or not replacement:
-            correction_filter = "missing_anchor"
-        elif len(quote) > 80 or len(replacement) > 80 or re.search(r"[;\n]|\b(?:also|and change)\b", replacement, re.I):
-            correction_filter = "invalid_replacement"
-        elif not re.search(re.escape(quote), answer, re.I):
-            correction_filter = "quote_not_found"
+            correction_guard = "passed"
         else:
-            correction_filter = "meaning_guard"
+            checked_quote, checked_replacement = text_anchors or (quote, replacement)
+            if not checked_quote or not checked_replacement:
+                correction_filter = "missing_anchor"
+                correction_guard = "missing_anchor"
+            elif (len(checked_quote) > 80 or len(checked_replacement) > 80
+                  or re.search(r"[;\n]|\b(?:also|and change)\b", checked_replacement, re.I)):
+                correction_filter = "invalid_replacement"
+                correction_guard = "invalid_replacement"
+            else:
+                match = re.search(rf"(?<!\w){re.escape(checked_quote)}(?!\w)", answer, re.I)
+                if not match:
+                    correction_filter = "quote_not_found"
+                    correction_guard = "quote_not_found"
+                else:
+                    candidate = f"{answer[:match.start()]}{checked_replacement}{answer[match.end():]}".strip()
+                    correction_guard = correction_guard_reason(answer, candidate) or "passed"
+                    correction_filter = "meaning_guard"
     tip = useful_expression_tip(answer, raw_tip)
     if raw_tip is None:
         tip_filter = "model_none"
@@ -320,6 +343,7 @@ INPUT_SOURCE: {source}
         correction, tip, rewrite = None, SAFE_ACTIONS[kind], None
         if raw_correction is not None:
             correction_filter = "answer_kind"
+            correction_guard = "answer_kind"
         if raw_tip is not None:
             tip_filter = "answer_kind"
     if tip and correction and tip.lower() == correction.lower():
@@ -333,36 +357,38 @@ INPUT_SOURCE: {source}
         rewrite_state = "answer_kind"
     elif get("GROUNDED") != "YES":
         rewrite_state = "model_not_grounded"
-    elif len(answer) > MAX_ANSWER_CHARS or not grounded_rewrite(answer, rewrite):
+    elif len(answer) > MAX_ANSWER_CHARS or rewrite_guard_reason(answer, rewrite):
         rewrite_state = "grounding_guard"
     elif (legacy.normalize_spoken_text_for_similarity(answer)
           == legacy.normalize_spoken_text_for_similarity(rewrite)):
         rewrite_state = "unchanged"
     else:
         rewrite_state = "shown"
+    rewrite_guard = rewrite_guard_reason(answer, rewrite) if rewrite else "missing"
+    if len(answer) > MAX_ANSWER_CHARS:
+        rewrite_guard = "length"
     if rewrite_state != "shown":
         rewrite = None
-        if include_upgrade and kind == "relevant":
-            rewrite = rewrite_from_grounded_correction(answer, quote, replacement, raw_correction)
-            if rewrite:
-                rewrite_state = "correction_fallback"
-    if (not correction and raw_correction and kind == "relevant"
-            and rewrite_state == "shown" and rewrite):
-        correction = correction_from_single_inflection(answer, rewrite)
+    if (not correction and raw_correction and kind == "relevant" and raw_rewrite
+            and include_upgrade and get("GROUNDED") == "YES"):
+        correction = correction_from_single_inflection(answer, raw_rewrite)
         if correction:
             correction_filter = "rewrite_inflection_fallback"
+            correction_guard = "passed"
             if tip:
                 tip = None
                 tip_filter = "replaced_by_correction"
     logger.info(
         "Part1 feedback outcome: adaptation=%s support_state=%s input_source=%s answer_kind=%s "
-        "model_uncertain_overridden=%s model_correction=%s model_quote=%s model_replacement=%s correction_filter=%s "
-        "model_tip=%s tip_filter=%s model_rewrite=%s correction_source=%s rewrite_state=%s",
+        "model_uncertain_overridden=%s model_correction=%s model_quote=%s model_replacement=%s "
+        "correction_filter=%s correction_guard=%s model_tip=%s tip_filter=%s "
+        "model_rewrite=%s correction_source=%s rewrite_state=%s rewrite_guard=%s",
         "adaptive" if adaptive else "standard", support_state, source, kind, unfounded_transcript_kind,
         field_states["CORRECTION"], anchor_states["CORRECTION_QUOTE"],
-        anchor_states["CORRECTION_REPLACEMENT"], correction_filter,
+        anchor_states["CORRECTION_REPLACEMENT"], correction_filter, correction_guard,
         field_states["EXPRESSION_TIP"], tip_filter,
-        field_states["UPGRADED_ANSWER"], "correction" if correction else "tip" if tip else "none", rewrite_state,
+        field_states["UPGRADED_ANSWER"], "correction" if correction else "tip" if tip else "none",
+        rewrite_state, rewrite_guard,
     )
     observation = None
     support, reason, evidence = get("SUPPORT"), get("REASON"), get("EVIDENCE")
