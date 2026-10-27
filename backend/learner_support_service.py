@@ -10,7 +10,12 @@ MIN_SUPPORT_EVIDENCE = 3
 SWITCH_CONFIRMATIONS = 2
 SUPPORT_GUIDANCE = {
     "unknown": "Use only this answer to choose one important issue and necessary support; do not infer a level.",
-    "guided": "Explain one meaning-blocking basic issue in simple English with one short usable example or action.",
+    "guided": (
+        "Prioritize one important basic-language issue. Correct a clear grammar error, including tense, "
+        "agreement, articles, or prepositions, even when the meaning is understandable; do not require it "
+        "to block meaning. Use one short, simple, usable correction. Do not invent errors or correct "
+        "capitalization, punctuation, or minor style. Return NONE when there is no meaningful issue."
+    ),
     "balanced": "Prioritize one key language or coherence issue; at most one distinct useful expression refinement.",
     "refinement": "Only suggest a specific evidenced improvement in naturalness or precision; NONE is welcome.",
 }

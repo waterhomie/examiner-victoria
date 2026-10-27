@@ -131,6 +131,37 @@ class AdaptiveFeedbackTests(unittest.TestCase):
                     self.assertIsNone(result.observation)
                     self.assertIsNotNone(result.feedback[1])
 
+    def test_clear_grammar_and_noop_answer_across_standard_and_adaptive_states(self):
+        answer = "There is many garden near my city."
+        natural_answer = "Yes, I often walk around the garden after dinner."
+        correction = 'Say "there are many gardens" instead of "there is many garden".'
+        modes = [("standard", None), *((state, state) for state in SUPPORT_GUIDANCE)]
+        for mode, state in modes:
+            with self.subTest(mode=mode, case="clear_grammar_error"):
+                profile = LearnerSupportProfile(state=state) if state is not None else None
+                self.model.return_value = output(answer, state=state or "unknown", correction=correction)
+                result = coach_part1_answer(
+                    "Are there many gardens near your city?",
+                    answer, True, profile, source="text",
+                )
+                prompt = self.model.call_args.args[0][0]["content"]
+                if state == "guided":
+                    self.assertIn("even when the meaning is understandable", prompt)
+                if state is None:
+                    self.assertIn("Do not classify a support state.", prompt)
+                else:
+                    self.assertIn("Also return SUPPORT", prompt)
+                self.assertEqual(result.feedback[0], correction)
+
+            with self.subTest(mode=mode, case="already_natural"):
+                profile = LearnerSupportProfile(state=state) if state is not None else None
+                self.model.return_value = output(natural_answer, state=state or "unknown")
+                result = coach_part1_answer(
+                    "Do you enjoy visiting parks and gardens now?",
+                    natural_answer, True, profile, source="text",
+                )
+                self.assertEqual(result.feedback[:3], (None, None, None))
+
     def test_mq001_003_008_and_grounding(self):
         answer = "Yes, I like music because it make me relax. For example, I listen music after school."
         self.model.return_value = output(answer, correction="Fix grammar; fix prepositions; fix articles.",

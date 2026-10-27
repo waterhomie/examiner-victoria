@@ -153,6 +153,7 @@ function assertStageCardSelector() {
   let state = createInitialAppState();
   state = appReducer(state, practiceOptionsLoaded({ part1_topics: ["work"], cue_cards: [] }));
   state = { ...state, practiceType: "part1", session: createSession({ phase: "identity" }) };
+  assert.equal(selectSessionView(state).showPart1TopicSelect, true);
   assert.equal(selectSessionView(state).shouldShowStageCard, true);
 
   state = {
@@ -176,7 +177,8 @@ function assertStageCardSelector() {
       candidate_answers: [{ phase: "part1", answer: "I study architecture." }],
     }),
   };
-  assert.equal(selectSessionView(state).shouldShowStageCard, true);
+  assert.equal(selectSessionView(state).showPart1TopicSelect, false);
+  assert.equal(selectSessionView(state).shouldShowStageCard, false);
 
   state = appReducer(
     createInitialAppState(),
