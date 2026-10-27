@@ -27,8 +27,10 @@ try {
   }));
   assert.equal((html.match(/This is not an IELTS level assessment/g) || []).length, 1);
   assert.equal((html.match(/aria-label="Play Natural version"/g) || []).length, 2);
-  assert.doesNotMatch(html, /Tap Quick correction or Natural version to play/);
-  assert.equal((html.match(/Tip: tap feedback text/g) || []).length, 1);
+  assert.equal((html.match(/Tip: tap Quick correction or Natural version/g) || []).length, 1);
+  assert.doesNotMatch(html, /Tip: tap feedback text/);
+  assert.match(html, /Feedback adjusts to your answers in this session\. This is not an IELTS level assessment\. Tip: tap Quick correction or Natural version to play Victoria&#x27;s voice\. Tap again to stop\./);
+  assert.ok(html.indexOf("When do you listen?") > html.indexOf("Tip: tap Quick correction"));
   const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" },
       { role: "assistant", content: "**Quick correction:** Say 'I agree'.\n\nNext question?" }],
