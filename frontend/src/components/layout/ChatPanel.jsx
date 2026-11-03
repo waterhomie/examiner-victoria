@@ -114,7 +114,7 @@ export function ChatPanel({
           <span>{error}</span>
           {canRetryRecording ? (
             <button type="button" onClick={retryLastRecording} disabled={Boolean(busy)} data-testid="retry-transcription-button">
-              Retry transcription
+              Retry this audio
             </button>
           ) : null}
         </div>

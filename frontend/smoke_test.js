@@ -289,6 +289,9 @@ async function assertApiErrorMapping() {
     { message: INVALID_ANSWER_MESSAGE },
   );
   assert.equal(friendlyError(new Error(INVALID_ANSWER_MESSAGE), "fallback"), INVALID_ANSWER_MESSAGE);
+  assert.match(friendlyError(new Error("No clear speech was detected."), "fallback"), /Type it below, or tap Voice to record again/);
+  assert.match(friendlyError(new Error("Recording is too short."), "fallback"), /Type your answer below, or tap Voice to record again/);
+  assert.match(friendlyError(new Error("Audio transcription failed."), "fallback"), /Type your answer below, or tap Voice to record again/);
 }
 
 async function assertTtsFailureMapping() {
