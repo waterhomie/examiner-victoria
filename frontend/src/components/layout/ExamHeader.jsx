@@ -41,8 +41,8 @@ export function ExamHeader({
         />
       </div>
       <div className="top-actions">
-        <label className="practice-select">
-          <span>Training</span>
+        <label className="practice-select" data-tour-target="mode">
+          <span>Mode</span>
           <select
             data-testid="training-mode-select"
             value={trainingMode}
@@ -56,7 +56,7 @@ export function ExamHeader({
             ))}
           </select>
         </label>
-        <label className="practice-select">
+        <label className="practice-select" data-tour-target="flow">
           <span>Flow</span>
           <select
             data-testid="practice-type-select"
@@ -73,6 +73,7 @@ export function ExamHeader({
         </label>
         <button
           className="ghost-button sound-toggle"
+          data-tour-target="sound"
           type="button"
           onClick={toggleAudioEnabled}
           data-testid="sound-toggle"

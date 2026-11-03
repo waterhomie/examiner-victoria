@@ -20,7 +20,7 @@ export function AnswerComposer({
 }) {
   return (
     <footer className="composer-wrap" data-testid="answer-composer">
-      <div className="composer">
+      <div className="composer" data-tour-target="answer">
         <button
           className="mode-button"
           type="button"

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AnswerComposer } from "./components/layout/AnswerComposer.jsx";
 import { ChatPanel } from "./components/layout/ChatPanel.jsx";
 import { ExamHeader } from "./components/layout/ExamHeader.jsx";
+import { GuidedTour } from "./components/layout/GuidedTour.jsx";
 import { ExamStageCard } from "./components/layout/ExamStageCard.jsx";
 import { MobileToasts } from "./components/layout/MobileToasts.jsx";
 import { RuntimeDiagnosticsPanel } from "./components/layout/RuntimeDiagnosticsPanel.jsx";
@@ -324,6 +325,15 @@ export default function App() {
         toggleRecording={handleToggleRecording}
         />
       ) : null}
+      <GuidedTour
+        ready={Boolean(state.session && !state.busy && !diagnosticsOpen)}
+        trainingMode={state.trainingMode}
+        practiceType={state.practiceType}
+        trainingModes={TRAINING_MODES}
+        practiceTypes={PRACTICE_TYPES}
+        chooseTrainingMode={(value) => controller.changeTrainingMode({ target: { value } })}
+        choosePracticeType={(value) => controller.changePracticeType({ target: { value } })}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment } from "react";
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
 import { splitFeedbackPlayback } from "../../utils/feedbackPlayback.js";
@@ -51,32 +51,11 @@ export function ChatPanel({
   shortScrollSlackRef,
 }) {
   const playback = feedbackPlayback;
-  const [showQuickGuide, setShowQuickGuide] = useState(() => {
-    try {
-      return localStorage.getItem("victoria-quick-guide-seen") !== "1";
-    } catch {
-      return true;
-    }
-  });
-  const hasAnswered = messages.some((message) => message.role === "user");
-  useEffect(() => {
-    if (!showQuickGuide || !hasAnswered) return;
-    setShowQuickGuide(false);
-    try {
-      localStorage.setItem("victoria-quick-guide-seen", "1");
-    } catch {
-      // The guide still closes when browser storage is unavailable.
-    }
-  }, [hasAnswered, showQuickGuide]);
-
   const firstPlayableFeedbackIndex = playback
     ? messages.findIndex((message) =>
         message.role === "assistant" && splitFeedbackPlayback(message.content).some((section) => section.text)
       )
     : -1;
-  const showFirstAnswerGuide = Boolean(
-    showQuickGuide && playback && messages.length === 1 && messages[0].role === "assistant"
-  );
 
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
@@ -92,13 +71,6 @@ export function ChatPanel({
             feedbackPlayback={playback}
             showPlaybackHint={index === firstPlayableFeedbackIndex}
           />
-          {showFirstAnswerGuide && index === 0 ? (
-            <aside className="quick-guide" aria-label="Quick guide">
-              <strong>Quick guide</strong>
-              <span>Practice gives feedback as you go; Mock gives a report at the end.</span>
-              <span>Tap to record, answer, then tap again to send.</span>
-            </aside>
-          ) : null}
         </Fragment>
       ))}
 
