@@ -150,7 +150,7 @@ def build_reply(
     upgraded_answer: str | None,
     next_content: str,
     feedback_available: bool = True,
-    merge_natural_version: bool = False,
+    merge_natural_version: bool = True,
 ) -> str:
     sections = []
     if not feedback_available:

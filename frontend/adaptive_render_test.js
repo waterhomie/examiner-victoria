@@ -27,16 +27,23 @@ try {
   }));
   assert.equal((html.match(/This is not an IELTS level assessment/g) || []).length, 1);
   assert.equal((html.match(/aria-label="Play Natural version"/g) || []).length, 2);
-  assert.doesNotMatch(html, /Tap Quick correction or Natural version to play/);
-  assert.equal((html.match(/Tip: tap feedback text/g) || []).length, 1);
+  assert.equal((html.match(/Tap Quick correction or Natural version to hear it/g) || []).length, 1);
+  const firstHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
+    messages: [{ role: "assistant", content: "First question?" }],
+    feedbackPlayback: { text: "", status: "", onPlay() {} },
+  }));
+  assert.match(firstHtml, /Quick guide/);
+  assert.match(firstHtml, /Tap to record, answer, then tap again to send/);
+  assert.doesNotMatch(firstHtml, /Tap Quick correction or Natural version to hear it/);
   const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" },
+      { role: "user", content: "I agree." },
       { role: "assistant", content: "**Quick correction:** Say 'I agree'.\n\nNext question?" }],
     feedbackPlayback: { text: "", status: "", onPlay() {} },
   }));
-  assert.match(standardHtml, /Tip: tap feedback text to play Victoria&#x27;s voice/);
-  assert.ok(standardHtml.indexOf("Tip: tap feedback text") < standardHtml.indexOf("First question?"));
-  assert.ok(standardHtml.indexOf("Tip: tap feedback text") < standardHtml.indexOf("Play Quick correction"));
+  assert.equal((standardHtml.match(/Tap Quick correction or Natural version to hear it/g) || []).length, 1);
+  assert.ok(standardHtml.indexOf("First question?") < standardHtml.indexOf("Tap Quick correction"));
+  assert.ok(standardHtml.indexOf("Tap Quick correction") < standardHtml.indexOf("Play Quick correction"));
   assert.doesNotMatch(html, /learner_support_profile|SUPPORT:|EVIDENCE:/);
   console.log("Adaptive feedback rendered settings, notice and F-015 controls passed.");
 } finally {

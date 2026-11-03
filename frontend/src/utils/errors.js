@@ -10,7 +10,10 @@ export function friendlyError(err, fallback) {
     return "Microphone access was blocked. Please allow microphone permission, or switch to Text.";
   }
   if (/recording is too short|too short/i.test(message)) {
-    return "That recording was too short. Tap again and answer in a complete sentence.";
+    return "That recording was too short. Type your answer below, or tap Voice to record again.";
+  }
+  if (/no clear speech was detected/i.test(message)) {
+    return "I couldn't make out your answer. Type it below, or tap Voice to record again.";
   }
   if (/no clear answer|answer in words/i.test(message)) {
     return INVALID_ANSWER_MESSAGE;
@@ -22,7 +25,7 @@ export function friendlyError(err, fallback) {
     return message;
   }
   if (/transcription|audio|whisper|duration/i.test(message)) {
-    return "Audio transcription is temporarily unavailable. You can switch to Text and type your answer.";
+    return "Audio transcription is temporarily unavailable. Type your answer below, or tap Voice to record again.";
   }
   if (/tts|voice playback|voice is temporarily unavailable|voice unavailable/i.test(message)) {
     return VOICE_UNAVAILABLE_MESSAGE;

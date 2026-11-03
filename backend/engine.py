@@ -122,7 +122,7 @@ def process_answer(
         session.current_question = next_content
 
     reply = build_reply(correction, expression_tip, upgraded_answer, next_content,
-                        feedback_available, merge_natural_version=focused_part1)
+                        feedback_available, merge_natural_version=session.practice_mode)
     assistant_message = ChatMessage(role="assistant", content=reply, phase=session.phase,
                                     adaptation_notice=adaptation_notice)
     session.messages.append(assistant_message)

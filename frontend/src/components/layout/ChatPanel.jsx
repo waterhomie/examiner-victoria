@@ -1,6 +1,7 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { PendingSpeechCard } from "./PendingSpeechCard.jsx";
 import { MessageBubble, ReportView } from "../messages/MessageViews.jsx";
+import { splitFeedbackPlayback } from "../../utils/feedbackPlayback.js";
 
 function MockExamCard({ mockExam, onReplayQuestion }) {
   if (!mockExam) return null;
@@ -50,20 +51,54 @@ export function ChatPanel({
   shortScrollSlackRef,
 }) {
   const playback = feedbackPlayback;
+  const [showQuickGuide, setShowQuickGuide] = useState(() => {
+    try {
+      return localStorage.getItem("victoria-quick-guide-seen") !== "1";
+    } catch {
+      return true;
+    }
+  });
+  const hasAnswered = messages.some((message) => message.role === "user");
+  useEffect(() => {
+    if (!showQuickGuide || !hasAnswered) return;
+    setShowQuickGuide(false);
+    try {
+      localStorage.setItem("victoria-quick-guide-seen", "1");
+    } catch {
+      // The guide still closes when browser storage is unavailable.
+    }
+  }, [hasAnswered, showQuickGuide]);
+
+  const firstPlayableFeedbackIndex = playback
+    ? messages.findIndex((message) =>
+        message.role === "assistant" && splitFeedbackPlayback(message.content).some((section) => section.text)
+      )
+    : -1;
+  const showFirstAnswerGuide = Boolean(
+    showQuickGuide && playback && messages.length === 1 && messages[0].role === "assistant"
+  );
+
   return (
     <main className="chat-panel" ref={chatPanelRef} data-testid="chat-panel">
       <MockExamCard mockExam={mockExam} onReplayQuestion={replayCurrentQuestion} />
-
-      {playback && messages.length > 0 ? <p className="feedback-playback-hint" role="note">
-        Tip: tap feedback text to play Victoria's voice. Tap again to stop.
-      </p> : null}
 
       {messages.map((message, index) => (
         <Fragment key={`${message.role}-${index}`}>
           {message.adaptation_notice ? <p className="feedback-playback-hint" role="note">
             Feedback adjusts to your answers in this session. This is not an IELTS level assessment.
           </p> : null}
-          <MessageBubble message={message} feedbackPlayback={playback} />
+          <MessageBubble
+            message={message}
+            feedbackPlayback={playback}
+            showPlaybackHint={index === firstPlayableFeedbackIndex}
+          />
+          {showFirstAnswerGuide && index === 0 ? (
+            <aside className="quick-guide" aria-label="Quick guide">
+              <strong>Quick guide</strong>
+              <span>Practice gives feedback as you go; Mock gives a report at the end.</span>
+              <span>Tap to record, answer, then tap again to send.</span>
+            </aside>
+          ) : null}
         </Fragment>
       ))}
 
@@ -79,7 +114,7 @@ export function ChatPanel({
           <span>{error}</span>
           {canRetryRecording ? (
             <button type="button" onClick={retryLastRecording} disabled={Boolean(busy)} data-testid="retry-transcription-button">
-              Retry transcription
+              Retry this audio
             </button>
           ) : null}
         </div>

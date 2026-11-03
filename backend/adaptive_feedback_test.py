@@ -211,7 +211,7 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         self.assertNotIn("**Better expression:**", reply)
         self.assertNotIn("**Next step:**", reply)
         self.assertNotIn("A natural version of your answer", reply)
-        self.assertIn("**A natural version of your answer:**", build_reply(*result.feedback[:3], "Next?"))
+        self.assertIn("**Natural version:**", build_reply(*result.feedback[:3], "Next?"))
         self.assertNotIn("SUPPORT:", reply)
         _, message, _, _ = process_answer(session(), answer)
         self.assertIn("**Natural version:** I enjoy music", message.content)

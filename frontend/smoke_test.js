@@ -67,12 +67,15 @@ function assertProductMetadata() {
   assert.doesNotMatch(stageCardSource, /stage-pill|training-pill|Current practice summary/);
 }
 
-function assertPersistentFeedbackPlaybackHint() {
+function assertContextualFeedbackPlaybackHint() {
   const chatPanelSource = readFileSync("./src/components/layout/ChatPanel.jsx", "utf8");
-  assert.match(chatPanelSource, /Tip: tap feedback text to play Victoria's voice\. Tap again to stop\./);
-  assert.match(chatPanelSource, /playback && messages\.length > 0/);
-  assert.doesNotMatch(chatPanelSource, /splitFeedbackPlayback\(message\.content\)/);
-  assert.doesNotMatch(chatPanelSource, /victoria-feedback-playback-tip|setShowPlaybackTip/);
+  const messageViewsSource = readFileSync("./src/components/messages/MessageViews.jsx", "utf8");
+  assert.match(chatPanelSource, /firstPlayableFeedbackIndex/);
+  assert.match(chatPanelSource, /splitFeedbackPlayback\(message\.content\)\.some\(\(section\) => section\.text\)/);
+  assert.match(chatPanelSource, /showPlaybackHint=\{index === firstPlayableFeedbackIndex\}/);
+  assert.match(chatPanelSource, /Quick guide/);
+  assert.match(messageViewsSource, /Tap Quick correction or Natural version to hear it/);
+  assert.doesNotMatch(chatPanelSource, /Tip: tap feedback text/);
 }
 
 function createSession(overrides = {}) {
@@ -286,6 +289,9 @@ async function assertApiErrorMapping() {
     { message: INVALID_ANSWER_MESSAGE },
   );
   assert.equal(friendlyError(new Error(INVALID_ANSWER_MESSAGE), "fallback"), INVALID_ANSWER_MESSAGE);
+  assert.match(friendlyError(new Error("No clear speech was detected."), "fallback"), /Type it below, or tap Voice to record again/);
+  assert.match(friendlyError(new Error("Recording is too short."), "fallback"), /Type your answer below, or tap Voice to record again/);
+  assert.match(friendlyError(new Error("Audio transcription failed."), "fallback"), /Type your answer below, or tap Voice to record again/);
 }
 
 async function assertTtsFailureMapping() {
@@ -479,7 +485,7 @@ function assertChatBottomAnchorContracts() {
 await assertApiErrorMapping();
 await assertTtsFailureMapping();
 assertProductMetadata();
-assertPersistentFeedbackPlaybackHint();
+assertContextualFeedbackPlaybackHint();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
 assertMockModeSelectors();

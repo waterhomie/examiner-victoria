@@ -24,6 +24,10 @@ function countTranscriptWords(text) {
   return (text.match(/[A-Za-z']+/g) || []).length;
 }
 
+function isUnclearRecording(error) {
+  return /no clear speech was detected/i.test(String(error?.message || ""));
+}
+
 function shouldTrustBrowserTranscript(text, duration) {
   const words = countTranscriptWords(text);
   if (!text.trim() || words === 0) return false;
@@ -216,7 +220,9 @@ export function useAnswerRecording({
       cleanupRecording();
       setElapsed(0);
       onModeChange("text");
-      setCanRetryRecording(Boolean(lastRecordingRef.current?.blob));
+      const canRetry = Boolean(lastRecordingRef.current?.blob) && !isUnclearRecording(err);
+      setCanRetryRecording(canRetry);
+      if (!canRetry) lastRecordingRef.current = null;
       onErrorChange(friendlyError(err, "Recording could not be sent."));
       onBusyChange("");
     }
@@ -253,7 +259,9 @@ export function useAnswerRecording({
         serverTotalMs: Date.now() - serverStartedAt,
         error: String(err?.message || err),
       });
-      setCanRetryRecording(true);
+      const canRetry = !isUnclearRecording(err);
+      setCanRetryRecording(canRetry);
+      if (!canRetry) lastRecordingRef.current = null;
       onErrorChange(friendlyError(err, "Recording could not be sent."));
       onBusyChange("");
     }

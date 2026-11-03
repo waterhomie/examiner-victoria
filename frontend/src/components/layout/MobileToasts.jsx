@@ -23,7 +23,7 @@ export function MobileToasts({
           <span>{error}</span>
           {canRetryRecording ? (
             <button type="button" onClick={retryLastRecording} disabled={Boolean(busy)}>
-              Retry
+              Retry audio
             </button>
           ) : null}
         </div>
