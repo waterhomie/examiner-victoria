@@ -227,7 +227,7 @@ export function ReportView({ report }) {
   );
 }
 
-export function MessageBubble({ message, feedbackPlayback }) {
+export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = false }) {
   const isUser = message.role === "user";
   const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(message.content) : null;
   return (
@@ -240,6 +240,11 @@ export function MessageBubble({ message, feedbackPlayback }) {
         {isUser ? "Y" : "V"}
       </div>
       <div className="bubble">
+        {showPlaybackHint ? (
+          <p className="feedback-playback-hint" role="note">
+            Tap Quick correction or Natural version to hear it. Tap again to stop.
+          </p>
+        ) : null}
         {sections ? sections.map((section, index) => {
           if (!section.text) return <RichMessage key={index} content={section.content} />;
           const active = feedbackPlayback.text === section.text;
