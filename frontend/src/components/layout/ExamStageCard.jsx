@@ -23,7 +23,7 @@ export function ExamStageCard({
         </div>
       ) : null}
       {showPart1TopicSelect ? (
-        <label className="topic-select">
+        <label className="topic-select" data-tour-target="topic">
           <span>Topic</span>
           <select
             value={selectedPart1Topic}
@@ -40,7 +40,7 @@ export function ExamStageCard({
         </label>
       ) : null}
       {showCueCardSelect ? (
-        <label className="topic-select">
+        <label className="topic-select" data-tour-target="cue-card">
           <span>Cue card</span>
           <select
             value={selectedCueCardTitle}

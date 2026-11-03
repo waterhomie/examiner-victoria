@@ -3,6 +3,7 @@ import { AnswerComposer } from "./components/layout/AnswerComposer.jsx";
 import { ChatPanel } from "./components/layout/ChatPanel.jsx";
 import { ExamHeader } from "./components/layout/ExamHeader.jsx";
 import { GuidedTour } from "./components/layout/GuidedTour.jsx";
+import { getTourSelectionKind } from "./components/layout/tourSteps.js";
 import { ExamStageCard } from "./components/layout/ExamStageCard.jsx";
 import { MobileToasts } from "./components/layout/MobileToasts.jsx";
 import { RuntimeDiagnosticsPanel } from "./components/layout/RuntimeDiagnosticsPanel.jsx";
@@ -33,6 +34,7 @@ export default function App() {
   const startupRecoveryAttemptedRef = useRef(false);
   const submitAnswerRef = useRef(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [guideReplayRequest, setGuideReplayRequest] = useState(0);
 
   const setBusy = useCallback((busy) => dispatch(busySet(busy)), []);
   const setDraft = useCallback((draft) => dispatch(draftSet(draft)), []);
@@ -245,6 +247,7 @@ export default function App() {
         trainingMode={state.trainingMode}
         trainingModes={TRAINING_MODES}
         openRuntimeDiagnostics={() => setDiagnosticsOpen(true)}
+        replayGuide={() => setGuideReplayRequest((request) => request + 1)}
       />
       {diagnosticsOpen ? (
         <RuntimeDiagnosticsPanel onClose={() => setDiagnosticsOpen(false)} />
@@ -327,10 +330,12 @@ export default function App() {
       ) : null}
       <GuidedTour
         ready={Boolean(state.session && !state.busy && !diagnosticsOpen)}
+        replayRequest={guideReplayRequest}
         trainingMode={state.trainingMode}
         practiceType={state.practiceType}
         trainingModes={TRAINING_MODES}
         practiceTypes={PRACTICE_TYPES}
+        selectionKind={getTourSelectionKind(sessionView)}
         chooseTrainingMode={(value) => controller.changeTrainingMode({ target: { value } })}
         choosePracticeType={(value) => controller.changePracticeType({ target: { value } })}
       />
