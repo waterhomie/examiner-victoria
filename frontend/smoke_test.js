@@ -73,7 +73,13 @@ function assertContextualFeedbackPlaybackHint() {
   assert.match(chatPanelSource, /firstPlayableFeedbackIndex/);
   assert.match(chatPanelSource, /splitFeedbackPlayback\(message\.content\)\.some\(\(section\) => section\.text\)/);
   assert.match(chatPanelSource, /showPlaybackHint=\{index === firstPlayableFeedbackIndex\}/);
-  assert.match(chatPanelSource, /Quick guide/);
+  const tourSource = readFileSync("./src/components/layout/GuidedTour.jsx", "utf8");
+  const appSource = readFileSync("./src/App.jsx", "utf8");
+  assert.match(appSource, /<GuidedTour/);
+  assert.match(tourSource, /Choose a mode to see what it does/);
+  assert.match(tourSource, /Practice: get a correction and a natural version/);
+  assert.match(tourSource, /Mock: follow the speaking test/);
+  assert.doesNotMatch(chatPanelSource, /Quick guide/);
   assert.match(messageViewsSource, /Tap Quick correction or Natural version to hear it/);
   assert.doesNotMatch(chatPanelSource, /Tip: tap feedback text/);
 }

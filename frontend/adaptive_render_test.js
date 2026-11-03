@@ -32,8 +32,7 @@ try {
     messages: [{ role: "assistant", content: "First question?" }],
     feedbackPlayback: { text: "", status: "", onPlay() {} },
   }));
-  assert.match(firstHtml, /Quick guide/);
-  assert.match(firstHtml, /Tap to record, answer, then tap again to send/);
+  assert.doesNotMatch(firstHtml, /Quick guide/);
   assert.doesNotMatch(firstHtml, /Tap Quick correction or Natural version to hear it/);
   const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" },
