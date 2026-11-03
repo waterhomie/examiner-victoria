@@ -27,6 +27,8 @@ import {
   getRecordingSupport,
 } from "./src/utils/runtimeDiagnostics.js";
 import { INVALID_ANSWER_MESSAGE, VOICE_UNAVAILABLE_MESSAGE, friendlyError } from "./src/utils/errors.js";
+import { getTourPosition } from "./src/components/layout/tourPosition.js";
+import { getTourSelectionKind, getTourTarget, nextTourStep, previousTourStep, TOUR_STAGES } from "./src/components/layout/tourSteps.js";
 
 function setNavigator(value) {
   Object.defineProperty(globalThis, "navigator", {
@@ -75,13 +77,72 @@ function assertContextualFeedbackPlaybackHint() {
   assert.match(chatPanelSource, /showPlaybackHint=\{index === firstPlayableFeedbackIndex\}/);
   const tourSource = readFileSync("./src/components/layout/GuidedTour.jsx", "utf8");
   const appSource = readFileSync("./src/App.jsx", "utf8");
+  const stageCardSource = readFileSync("./src/components/layout/ExamStageCard.jsx", "utf8");
+  const headerSource = readFileSync("./src/components/layout/ExamHeader.jsx", "utf8");
+  const headerCss = readFileSync("./src/styles/header.css", "utf8");
+  const chatCss = readFileSync("./src/styles/chat.css", "utf8");
   assert.match(appSource, /<GuidedTour/);
   assert.match(tourSource, /Choose a mode to see what it does/);
   assert.match(tourSource, /Practice: get a correction and a natural version/);
   assert.match(tourSource, /Mock: follow the speaking test/);
+  assert.match(tourSource, /previousTourStep\(step, selectionKind\)/);
+  assert.match(tourSource, /This selector disappears after your first Part 1 answer/);
+  assert.match(stageCardSource, /data-tour-target="topic"/);
+  assert.match(stageCardSource, /data-tour-target="cue-card"/);
+  assert.match(appSource, /selectionKind=\{getTourSelectionKind\(sessionView\)\}/);
+  assert.match(appSource, /replayRequest=\{guideReplayRequest\}/);
+  assert.match(headerSource, /data-testid="replay-guide-button"/);
+  assert.match(headerSource, /Show guide/);
+  assert.match(headerCss, /\.mobile-more-menu \{\s*display: block;/);
+  assert.match(tourSource, /if \(replayRequest === 0\) return;/);
+  assert.match(tourSource, /setStep\(0\);/);
+  assert.match(tourSource, /More → Show guide/);
+  assert.match(tourSource, /Finish guide/);
+  assert.match(chatCss, /\.stage-card:has\(\.tour-target-active\) \{ position: relative; z-index: 101;/);
+  assert.match(tourSource, /<div className="tour-scrim" aria-hidden="true" \/>/);
+  assert.match(tourSource, /<div className="tour-popover" role="dialog"/);
+  assert.match(tourSource, /createPortal\(/);
+  assert.match(tourSource, /document\.body/);
+  assert.doesNotMatch(tourSource, /tour-layer/);
   assert.doesNotMatch(chatPanelSource, /Quick guide/);
   assert.match(messageViewsSource, /Tap Quick correction or Natural version to hear it/);
   assert.doesNotMatch(chatPanelSource, /Tip: tap feedback text/);
+}
+
+function assertTourPositioning() {
+  const viewport = { width: 375, height: 667 };
+  const popover = { width: 300, height: 270 };
+  const flow = { left: 275, top: 60, bottom: 110 };
+  const below = getTourPosition(flow, popover, viewport);
+  assert.equal(below.top, 124);
+  assert.equal(below.left, 63);
+  assert.equal(below.maxHeight, 270);
+
+  const answer = { left: 20, top: 580, bottom: 650 };
+  const above = getTourPosition(answer, popover, viewport);
+  assert.ok(above.top + above.maxHeight <= answer.top - 14);
+
+  const compact = getTourPosition(flow, popover, { width: 375, height: 320 });
+  assert.ok(compact.top >= flow.bottom + 14);
+  assert.ok(compact.top + compact.maxHeight <= 320 - 12);
+  assert.ok(compact.maxHeight < popover.height);
+}
+
+function assertTourSelectionSteps() {
+  const flowInfo = TOUR_STAGES.indexOf("flow-info");
+  const selection = TOUR_STAGES.indexOf("selection");
+  const sound = TOUR_STAGES.indexOf("sound");
+  assert.equal(getTourTarget("selection", "topic"), "topic");
+  assert.equal(getTourTarget("selection", "cue-card"), "cue-card");
+  assert.equal(getTourSelectionKind({ shouldShowStageCard: true, showPart1TopicSelect: true }), "topic");
+  assert.equal(getTourSelectionKind({ shouldShowStageCard: true, showCueCardSelect: true }), "cue-card");
+  assert.equal(getTourSelectionKind({ shouldShowStageCard: false, showPart1TopicSelect: true }), null);
+  assert.equal(getTourSelectionKind({ shouldShowStageCard: true }), null);
+  assert.equal(nextTourStep(flowInfo, "topic"), selection);
+  assert.equal(nextTourStep(flowInfo, "cue-card"), selection);
+  assert.equal(nextTourStep(flowInfo, null), sound);
+  assert.equal(previousTourStep(sound, "topic"), selection);
+  assert.equal(previousTourStep(sound, null), flowInfo);
 }
 
 function createSession(overrides = {}) {
@@ -492,6 +553,8 @@ await assertApiErrorMapping();
 await assertTtsFailureMapping();
 assertProductMetadata();
 assertContextualFeedbackPlaybackHint();
+assertTourPositioning();
+assertTourSelectionSteps();
 assertBrowserSpeechIOSGuard();
 assertCapabilities();
 assertMockModeSelectors();

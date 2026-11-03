@@ -16,6 +16,7 @@ export function ExamHeader({
   practiceType,
   practiceTypes,
   openRuntimeDiagnostics,
+  replayGuide,
   recording,
   requestReport,
   session,
@@ -103,6 +104,12 @@ export function ExamHeader({
         <details className={`mobile-more-menu ${isPracticeMode && practiceType === "part1" ? "adaptive-settings-menu" : ""}`}>
           <summary>More</summary>
           <div className="mobile-more-panel">
+            <button type="button" onClick={(event) => {
+              event.currentTarget.closest("details")?.removeAttribute("open");
+              replayGuide();
+            }} data-testid="replay-guide-button">
+              Show guide
+            </button>
             {isPracticeMode && practiceType === "part1" ? (
               <label className="adaptive-feedback-setting">
                 <input type="checkbox" data-testid="adaptive-feedback-toggle"
