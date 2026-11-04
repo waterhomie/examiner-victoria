@@ -69,16 +69,17 @@ export function AnswerComposer({
             >
               {recordButtonText}
             </button>
-            <span className="timer">{recording ? formatDuration(elapsed) : "ready"}</span>
+            {recording ? <span className="timer">{formatDuration(elapsed)}</span> : null}
             {recording ? <button className="cancel-recording" type="button" onClick={cancelRecording} data-testid="cancel-recording-button">Cancel</button> : null}
             <label className="review-toggle">
               <input
                 data-testid="review-before-send-checkbox"
+                aria-label="Check transcript before sending"
                 type="checkbox"
                 checked={reviewBeforeSend}
                 onChange={(event) => onReviewBeforeSendChange(event.target.checked)}
               />
-              <span>review before send</span>
+              <span>Check transcript before sending</span>
             </label>
           </div>
         ) : (

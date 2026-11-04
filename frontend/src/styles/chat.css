@@ -408,6 +408,8 @@ blockquote {
 }
 .feedback-playback-status { display: block; padding-bottom: 4px; }
 .feedback-playback-hint { margin: 0; text-align: left; }
+.feedback-help-line { display: block; }
+.feedback-help-line + .feedback-help-line { margin-top: 4px; }
 .bubble > .feedback-playback-hint {
   margin: 0 0 10px;
   padding: 8px 10px;
