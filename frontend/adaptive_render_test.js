@@ -14,7 +14,8 @@ try {
     sessionStats: { answers: 0 }, stageProgress: 0, isPracticeMode: true, practiceType: "part1",
     feedbackAdaptation: "adaptive", changePracticeType() {}, changeTrainingMode() {}, changeFeedbackAdaptation() {} };
   const header = renderToStaticMarkup(React.createElement(ExamHeader, base));
-  assert.match(header, /data-tour-target="flow"[^>]*><span>Part<\/span>/);
+  assert.match(header, /data-tour-target="flow"[^>]*><select[^>]*aria-label="Choose speaking part"/);
+  assert.doesNotMatch(header, /data-tour-target="flow"[^>]*><span>Part<\/span>/);
   const stage = renderToStaticMarkup(React.createElement(ExamStageCard, {
     practiceOptions: { part1_topics: [], cue_cards: [] }, showCueCardSelect: true, stageProgress: 0,
   }));
