@@ -58,9 +58,9 @@ export function ExamHeader({
           </select>
         </label>
         <label className="practice-select" data-tour-target="flow">
-          <span>Part</span>
           <select
             data-testid="practice-type-select"
+            aria-label="Choose speaking part"
             value={practiceType}
             onChange={changePracticeType}
             disabled={controlsDisabled}
