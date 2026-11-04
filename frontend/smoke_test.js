@@ -3,6 +3,7 @@ import "./feedback_playback_test.js";
 import "./speech_playback_test.js";
 import "./adaptive_feedback_test.js";
 import "./adaptive_render_test.js";
+import "./audio_silence_test.js";
 import { readFileSync } from "node:fs";
 
 import { fetchRuntimeDiagnostics, healthCheck, sendAnswer, sendTelemetryEvent, synthesizeSpeech, TTS_TIMEOUT_MS } from "./src/api.js";
@@ -365,6 +366,10 @@ async function assertApiErrorMapping() {
   });
   assert.match(transcriptionRecovery(new Error("No clear speech was detected.")).message, /try answering in English again/);
   assert.equal(transcriptionRecovery(new Error("No clear speech was detected.")).retryAudio, false);
+  assert.deepEqual(transcriptionRecovery(new Error("Clearly silent recording.")), {
+    message: "No sound was detected. Tap Voice to record again, or type your answer below.",
+    retryAudio: false,
+  });
   assert.equal(transcriptionRecovery(Object.assign(new Error("Audio is too large"), { status: 413 })).retryAudio, false);
   assert.equal(transcriptionRecovery(Object.assign(new Error("Too many requests"), { status: 429 })).retryAudio, false);
   assert.equal(transcriptionRecovery(new Error("Microphone permission denied")).retryAudio, false);
