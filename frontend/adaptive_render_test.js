@@ -14,6 +14,8 @@ try {
     sessionStats: { answers: 0 }, stageProgress: 0, isPracticeMode: true, practiceType: "part1",
     feedbackAdaptation: "adaptive", changePracticeType() {}, changeTrainingMode() {}, changeFeedbackAdaptation() {} };
   const header = renderToStaticMarkup(React.createElement(ExamHeader, base));
+  const statusHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, currentPhase: "Part 1" }));
+  assert.match(statusHeader, /data-testid="current-speaking-stage">Part 1 · Practice/);
   const activeHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, canScoreNow: true, canExportRecord: true }));
   assert.doesNotMatch(activeHeader, /data-testid="(?:score|export|restart)-button"/);
   assert.match(activeHeader, /data-testid="mobile-export-button"/);
@@ -41,6 +43,10 @@ try {
     mode: "voice", recording: true, session: { test_active: true }, formatDuration: () => "00:01",
   }));
   assert.match(recordingComposer, /data-testid="cancel-recording-button"/);
+  assert.match(recordingComposer, /aria-label="Check transcript before sending"/);
+  assert.match(recordingComposer, /<span class="timer">00:01<\/span>/);
+  const idleVoice = renderToStaticMarkup(React.createElement(AnswerComposer, { mode: "voice", session: { test_active: true } }));
+  assert.doesNotMatch(idleVoice, /class="timer"/);
   assert.match(header, /data-testid="adaptive-feedback-toggle"[^>]*checked/);
   assert.match(header, /Adapt feedback to my answers/);
   assert.match(header, /adaptive-settings-menu/);
@@ -68,7 +74,7 @@ try {
   }));
   assert.match(loadingHtml, /Preparing audio… Tap to cancel/);
   assert.equal((html.match(/class="feedback-next-question"/g) || []).length, 2);
-  assert.equal((html.match(/Natural version<\/strong> shows a smoother way/g) || []).length, 1);
+  assert.equal((html.match(/Natural version<\/strong> — A smoother way/g) || []).length, 1);
   assert.equal((html.match(/You may not need both every time/g) || []).length, 1);
   const firstHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" }],
@@ -83,10 +89,10 @@ try {
       { role: "assistant", content: "**Quick correction:** Say 'I agree'.\n\nNext question?" }],
     feedbackPlayback: { text: "", status: "", onPlay() {} },
   }));
-  assert.equal((standardHtml.match(/Quick correction<\/strong> points out one important fix/g) || []).length, 1);
-  assert.doesNotMatch(standardHtml, /Natural version<\/strong> shows a smoother way/);
-  assert.ok(standardHtml.indexOf("First question?") < standardHtml.indexOf("points out one important fix"));
-  assert.ok(standardHtml.indexOf("points out one important fix") < standardHtml.indexOf("Play Quick correction"));
+  assert.equal((standardHtml.match(/Quick correction<\/strong> — One important fix/g) || []).length, 1);
+  assert.doesNotMatch(standardHtml, /Natural version<\/strong> — A smoother way/);
+  assert.ok(standardHtml.indexOf("First question?") < standardHtml.indexOf("One important fix"));
+  assert.ok(standardHtml.indexOf("One important fix") < standardHtml.indexOf("Play Quick correction"));
   assert.doesNotMatch(html, /learner_support_profile|SUPPORT:|EVIDENCE:/);
   console.log("Adaptive feedback rendered settings, notice and F-015 controls passed.");
 } finally {

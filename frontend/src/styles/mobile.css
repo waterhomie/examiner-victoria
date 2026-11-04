@@ -333,6 +333,9 @@
   .review-toggle span {
     display: inline;
     font-size: 12px;
+    max-width: 90px;
+    white-space: normal;
+    line-height: 1.25;
   }
 
   .score-button {
@@ -454,7 +457,7 @@
   }
 
   .review-toggle span {
-    display: none;
+    display: inline;
   }
 }
 

@@ -33,6 +33,9 @@ export function ExamHeader({
       <div className="brand-block">
         <div className="eyebrow">IELTS Speaking Coach</div>
         <h1>Examiner Victoria</h1>
+        {session ? <div className="header-current-stage" aria-label="Current speaking stage" data-testid="current-speaking-stage">
+          {currentPhase} · {isPracticeMode ? "Practice" : "Mock"}
+        </div> : null}
         <StageSummary
           currentPhase={currentPhase}
           isPracticeMode={isPracticeMode}

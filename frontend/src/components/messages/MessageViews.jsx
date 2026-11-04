@@ -244,9 +244,9 @@ export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = fa
       <div className="bubble">
         {showPlaybackHint ? (
           <p className="feedback-playback-hint" role="note">
-            {hasCorrection ? <span><strong>Quick correction</strong> points out one important fix. </span> : null}
-            {hasNaturalVersion ? <span><strong>Natural version</strong> shows a smoother way to say your answer. </span> : null}
-            You may not need both every time. Tap feedback text to hear it; tap again to stop.
+            {hasCorrection ? <span className="feedback-help-line"><strong>Quick correction</strong> — One important fix.</span> : null}
+            {hasNaturalVersion ? <span className="feedback-help-line"><strong>Natural version</strong> — A smoother way to say your answer.</span> : null}
+            <span className="feedback-help-line">Tap feedback text to listen; tap again to stop. You may not need both every time.</span>
           </p>
         ) : null}
         {sections ? sections.map((section, index) => {
