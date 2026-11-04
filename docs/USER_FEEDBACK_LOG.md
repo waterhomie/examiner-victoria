@@ -40,6 +40,21 @@
 - T005 requested answer inspiration grounded in the user's own topics and real experiences, highlighting that some learners need help with what to say, not only how to phrase it.
 - The feedback focus has shifted from basic access and runtime viability toward learning outcomes, report traceability, record management, language assistance, and personalized content. This is a positive signal that the core path is usable, not proof of broad market validation.
 
+### 2026-11-04 | First-use observation (local session)
+
+This is a separate, facilitator-present first-use session. The participant first saw the earlier interface, then tried the local interactive-guide preview on the same computer. The facilitator explained controls during the test, so this is evidence of observed friction and stated preferences, **not** evidence that a new user independently completed a question. The participant has not been cross-checked against T001–T005; do not change the cumulative tester count yet. The private recording and machine transcript remain outside this repository. Times below refer to that recording, and ambiguous speaker turns need confirmation by listening again.
+
+| Time | Observed or stated signal | Product implication to validate | Status |
+|---|---|---|---|
+| 00:50–01:27 | The participant asked whether the initial content was something to read or a question to answer. Entering the answer interface immediately felt confusing; they suggested choosing Practice or Mock on an initial screen. | Test whether the guide alone establishes the first action, or whether a lighter mode-selection entry is needed. Do not add another mode or entry screen from this single session. | Needs independent first-use retest |
+| 02:49–03:03; 11:22–11:26 | The participant initially found Restart hard to locate; later, in the local preview, they found it. | Compare Restart discoverability before and after the guide/layout changes. | Mixed observation; retest |
+| 04:19–04:51 | A participant/facilitator exchange raised the need to cancel a poor recording, speak again, and decide whether a new answer replaces or preserves the first. Speaker attribution is uncertain. | Inspect the actual recording and retry flow before treating this as a confirmed feature request. | Attribution and scope pending |
+| 08:35–10:55 | In the local preview, the interactive guide led through Mode and Flow. The participant said the flow became more understandable, but needed help finding the Flow control during the walkthrough. | Test guide discoverability and progression without facilitator prompts on desktop and mobile. | Guided use observed; independent validation pending |
+| 10:55–11:14 | The label “Flow” did not clearly convey Part selection; the participant suggested “Part.” | Compare the labels with fresh users before renaming the control. | Wording hypothesis |
+| 11:58–12:14 | “Cue card” did not suggest topic selection to the participant; they suggested “Topic.” | Check whether the label or nearby explanation should distinguish the IELTS cue card from choosing its topic. | Wording hypothesis |
+
+The local preview did not play audio in this session (11:28–11:52). Its TTS was not configured, so this does **not** establish a production playback defect. The next test should record whether the user can select a mode and Part, choose a topic, answer one question, find Restart, and understand replay **without facilitator instruction**. Record the build, device, browser, and whether audio was enabled.
+
 ## 3. Feedback Table
 
 | ID | Tester | User feedback | Product issue | Current capability | Product decision | Priority | Status |
