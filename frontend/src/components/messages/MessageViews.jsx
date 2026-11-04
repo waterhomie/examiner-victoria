@@ -230,6 +230,8 @@ export function ReportView({ report }) {
 export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = false }) {
   const isUser = message.role === "user";
   const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(message.content) : null;
+  const hasCorrection = sections?.some((section) => section.label === "Quick correction" && section.text);
+  const hasNaturalVersion = sections?.some((section) => section.label === "Natural version" && section.text);
   return (
     <article
       className={`message-row ${isUser ? "user" : "assistant"}`}
@@ -242,19 +244,27 @@ export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = fa
       <div className="bubble">
         {showPlaybackHint ? (
           <p className="feedback-playback-hint" role="note">
-            Tap Quick correction or Natural version to hear it. Tap again to stop.
+            {hasCorrection ? <span><strong>Quick correction</strong> points out one important fix. </span> : null}
+            {hasNaturalVersion ? <span><strong>Natural version</strong> shows a smoother way to say your answer. </span> : null}
+            You may not need both every time. Tap feedback text to hear it; tap again to stop.
           </p>
         ) : null}
         {sections ? sections.map((section, index) => {
-          if (!section.text) return <RichMessage key={index} content={section.content} />;
+          if (!section.text) {
+            const followsFeedback = sections.slice(0, index).some((item) => item.text);
+            const isQuestion = followsFeedback && /\?\s*$/.test(section.content);
+            return <div key={index} className={isQuestion ? "feedback-next-question" : undefined}>
+              <RichMessage content={section.content} />
+            </div>;
+          }
           const active = feedbackPlayback.text === section.text;
           const status = active ? feedbackPlayback.status : "";
           return (
-            <div key={index} className={`feedback-playback ${active ? "active" : ""}`}
+            <div key={index} className={`feedback-playback ${active ? "active" : ""} ${status ? `is-${status}` : ""}`}
               role="button" tabIndex={feedbackPlayback.disabled ? -1 : 0}
               aria-disabled={feedbackPlayback.disabled}
-              aria-label={`${active ? "Stop" : "Play"} ${section.label}`}
-              aria-pressed={active}
+              aria-label={`${active && (status === "playing" || status === "loading") ? "Stop" : "Play"} ${section.label}`}
+              aria-pressed={active && (status === "playing" || status === "loading")}
               onClick={() => { if (!feedbackPlayback.disabled) feedbackPlayback.onPlay(section.text); }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {

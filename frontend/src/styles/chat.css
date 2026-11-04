@@ -14,6 +14,13 @@
   display: none;
 }
 
+.feedback-next-question {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
 .chat-bottom-anchor {
   flex: 0 0 106px;
   width: 100%;
@@ -100,8 +107,9 @@
 .message-row.user .bubble {
   grid-column: 1;
   justify-self: end;
-  background: #ff4b4b;
-  color: white;
+  background: #ffebe8;
+  color: #542326;
+  border: 1px solid rgba(232, 75, 75, 0.18);
   border-bottom-right-radius: 8px;
 }
 
@@ -209,8 +217,8 @@ blockquote {
 }
 
 .message-row.user blockquote {
-  color: rgba(255, 255, 255, 0.78);
-  border-left-color: rgba(255, 255, 255, 0.42);
+  color: #694c50;
+  border-left-color: rgba(177, 69, 73, 0.38);
 }
 
 .status-card,
@@ -378,13 +386,21 @@ blockquote {
   padding: 4px 8px;
   margin: 4px -8px;
 }
-.feedback-playback:hover, .feedback-playback.active {
+.feedback-playback:not([aria-disabled="true"]):hover,
+.feedback-playback:focus-visible,
+.feedback-playback.active {
   background: rgba(40, 110, 200, 0.08);
 }
+.feedback-playback.is-loading,
+.feedback-playback.is-playing {
+  background: rgba(40, 110, 200, 0.12);
+  box-shadow: inset 3px 0 0 #286ec8;
+}
 .feedback-playback:focus-visible {
-  outline: 2px solid #286ec8;
+  outline: 3px solid #286ec8;
   outline-offset: 2px;
 }
+.feedback-playback:active:not([aria-disabled="true"]) { background: rgba(40, 110, 200, 0.16); }
 .feedback-playback[aria-disabled="true"] { cursor: default; opacity: 0.65; }
 .feedback-playback-status, .feedback-playback-hint {
   color: var(--muted);

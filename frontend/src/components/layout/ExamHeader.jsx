@@ -82,24 +82,11 @@ export function ExamHeader({
           {audioEnabled ? "Sound on" : "Sound off"}
         </button>
         <div className="desktop-action-buttons">
-          {canScoreNow ? (
+          {canScoreNow && session?.phase === "complete" ? (
             <button className="ghost-button" type="button" onClick={requestReport} data-testid="score-button">
               Score
             </button>
           ) : null}
-          {canExportRecord ? (
-            <button
-              className="ghost-button"
-              type="button"
-              onClick={downloadPracticeRecord}
-              data-testid="export-button"
-            >
-              Export
-            </button>
-          ) : null}
-          <button className="ghost-button" type="button" onClick={() => createFreshSession()} data-testid="restart-button">
-            Restart
-          </button>
         </div>
         <details className={`mobile-more-menu ${isPracticeMode && practiceType === "part1" ? "adaptive-settings-menu" : ""}`}>
           <summary>More</summary>
