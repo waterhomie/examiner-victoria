@@ -7,6 +7,30 @@
   transform: translateX(-50%);
 }
 
+.recording-review {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+
+.recording-review button, .cancel-recording {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: var(--soft);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .composer {
   display: flex;
   align-items: center;

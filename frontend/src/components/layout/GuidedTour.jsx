@@ -102,16 +102,16 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
     "mode-info": trainingMode === "practice"
       ? "Practice: get a correction and a natural version after each answer."
       : "Mock: follow the speaking test without feedback after every answer. Review your performance at the end.",
-    flow: "Tap Flow to choose what you want to practise.",
+    flow: "Tap Part to choose what you want to practise.",
     "flow-choice": "Choose one part or the full speaking test.",
     "flow-info": practiceType === "full" ? "Full takes you through Parts 1, 2 and 3."
-      : `${practiceTypes.find((item) => item.value === practiceType)?.label || "This part"} lets you focus on one section.${selectionKind ? ` Next, choose ${selectionKind === "topic" ? "a Topic" : "a Cue card"} or keep it random.` : ""}`,
+      : `${practiceTypes.find((item) => item.value === practiceType)?.label || "This part"} lets you focus on one section.${selectionKind ? " Next, choose a Topic or keep it random." : ""}`,
     selection: selectionKind === "topic"
       ? "Choose a Topic or keep Random topic. Changing it starts a new session. This selector disappears after your first Part 1 answer."
-      : "Choose a Cue card or keep Random cue card. Changing it starts a new session.",
+      : "Choose a Topic (IELTS cue card) or keep Random topic. Changing it starts a new session.",
     sound: "Tap Sound to turn Victoria's voice on or off.",
     "sound-info": "You can listen to Victoria's questions or read them on screen.",
-    answer: "You're ready. Tap Text to type, or tap the recording area to speak. Find this guide again under More → Show guide.",
+    answer: "You're ready. Tap Text to type, or tap the recording area to speak. You can cancel a recording or review and retake it before sending. Find this guide again under More → Show guide.",
   };
   const options = stage === "mode-choice" || stage === "mode-info" ? trainingModes : practiceTypes;
   const choose = (value) => {

@@ -7,11 +7,30 @@ const server = await createServer({ server: { middlewareMode: true }, appType: "
   optimizeDeps: { noDiscovery: true, include: [] } });
 try {
   const { ExamHeader } = await server.ssrLoadModule("/src/components/layout/ExamHeader.jsx");
+  const { ExamStageCard } = await server.ssrLoadModule("/src/components/layout/ExamStageCard.jsx");
+  const { AnswerComposer } = await server.ssrLoadModule("/src/components/layout/AnswerComposer.jsx");
   const { ChatPanel } = await server.ssrLoadModule("/src/components/layout/ChatPanel.jsx");
   const base = { trainingModes: [], practiceTypes: [], session: { phase: "part1" },
     sessionStats: { answers: 0 }, stageProgress: 0, isPracticeMode: true, practiceType: "part1",
     feedbackAdaptation: "adaptive", changePracticeType() {}, changeTrainingMode() {}, changeFeedbackAdaptation() {} };
   const header = renderToStaticMarkup(React.createElement(ExamHeader, base));
+  assert.match(header, /data-tour-target="flow"[^>]*><span>Part<\/span>/);
+  const stage = renderToStaticMarkup(React.createElement(ExamStageCard, {
+    practiceOptions: { part1_topics: [], cue_cards: [] }, showCueCardSelect: true, stageProgress: 0,
+  }));
+  assert.match(stage, /data-tour-target="cue-card"[^>]*><span>Topic<\/span>/);
+  assert.match(stage, /Random topic/);
+  const composer = renderToStaticMarkup(React.createElement(AnswerComposer, {
+    mode: "text", draft: "First take", reviewedRecording: true, replacementDraft: "Second take",
+    session: { test_active: true },
+  }));
+  assert.match(composer, /Keep previous/);
+  assert.match(composer, /Use new take/);
+  assert.match(composer, /<button type="submit" disabled="" data-testid="send-answer-button"/);
+  const recordingComposer = renderToStaticMarkup(React.createElement(AnswerComposer, {
+    mode: "voice", recording: true, session: { test_active: true }, formatDuration: () => "00:01",
+  }));
+  assert.match(recordingComposer, /data-testid="cancel-recording-button"/);
   assert.match(header, /data-testid="adaptive-feedback-toggle"[^>]*checked/);
   assert.match(header, /Adapt feedback to my answers/);
   assert.match(header, /adaptive-settings-menu/);

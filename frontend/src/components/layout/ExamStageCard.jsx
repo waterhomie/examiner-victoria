@@ -41,13 +41,13 @@ export function ExamStageCard({
       ) : null}
       {showCueCardSelect ? (
         <label className="topic-select" data-tour-target="cue-card">
-          <span>Cue card</span>
+          <span>Topic</span>
           <select
             value={selectedCueCardTitle}
             onChange={changeCueCardTitle}
             disabled={controlsDisabled}
           >
-            <option value="">Random cue card</option>
+            <option value="">Random topic</option>
             {practiceOptions.cue_cards.map((card) => (
               <option key={card.title} value={card.title}>
                 {card.title}

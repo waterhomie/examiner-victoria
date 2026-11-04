@@ -61,6 +61,7 @@ async function startPreferredRecorder() {
 
 export function useAnswerRecording({
   busy,
+  draft,
   onBusyChange,
   onDraftChange,
   onErrorChange,
@@ -71,6 +72,8 @@ export function useAnswerRecording({
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [canRetryRecording, setCanRetryRecording] = useState(false);
+  const [reviewedRecording, setReviewedRecording] = useState(false);
+  const [replacementDraft, setReplacementDraft] = useState("");
   const recorderRef = useRef(null);
   const browserSpeechRef = useRef(null);
   const lastRecordingRef = useRef(null);
@@ -91,15 +94,53 @@ export function useAnswerRecording({
     setCanRetryRecording(false);
     setRecording(false);
     setElapsed(0);
+    setReviewedRecording(false);
+    setReplacementDraft("");
   }, [cleanupRecording]);
+
+  const cancelRecording = useCallback(() => {
+    if (!recording) return;
+    cleanupRecording();
+    setRecording(false);
+    setElapsed(0);
+    onErrorChange("");
+  }, [cleanupRecording, onErrorChange, recording]);
+
+  const discardReviewedDraft = useCallback(() => {
+    onDraftChange("");
+    setReviewedRecording(false);
+    setReplacementDraft("");
+  }, [onDraftChange]);
+
+  const keepPreviousDraft = useCallback(() => setReplacementDraft(""), []);
+  const useReplacementDraft = useCallback(() => {
+    onDraftChange(replacementDraft);
+    setReplacementDraft("");
+  }, [onDraftChange, replacementDraft]);
+
+  const beginRetake = useCallback(() => {
+    setReplacementDraft("");
+    onModeChange("voice");
+  }, [onModeChange]);
 
   useEffect(() => cleanupRecording, [cleanupRecording]);
   usePagehideCleanup(cleanupRecording);
+  useEffect(() => {
+    if (busy === "thinking") {
+      setReviewedRecording(false);
+      setReplacementDraft("");
+    }
+  }, [busy]);
 
   const handleTranscribedAudio = useCallback(
     async (text, duration) => {
       if (reviewBeforeSend) {
-        onDraftChange(text);
+        if (reviewedRecording && draft.trim()) {
+          setReplacementDraft(text);
+        } else {
+          onDraftChange(text);
+        }
+        setReviewedRecording(true);
         onModeChange("text");
         onBusyChange("");
       } else {
@@ -108,7 +149,7 @@ export function useAnswerRecording({
       lastRecordingRef.current = null;
       setCanRetryRecording(false);
     },
-    [onBusyChange, onDraftChange, onModeChange, reviewBeforeSend, submitAnswer],
+    [draft, onBusyChange, onDraftChange, onModeChange, reviewBeforeSend, reviewedRecording, submitAnswer],
   );
 
   const toggleRecording = useCallback(async () => {
@@ -268,12 +309,19 @@ export function useAnswerRecording({
   }, [busy, handleTranscribedAudio, onBusyChange, onErrorChange]);
 
   return {
+    beginRetake,
+    cancelRecording,
     canRetryRecording,
     cleanupRecording,
+    discardReviewedDraft,
     elapsed,
+    keepPreviousDraft,
     recording,
+    replacementDraft,
     resetRecording,
+    reviewedRecording,
     retryLastRecording,
     toggleRecording,
+    useReplacementDraft,
   };
 }

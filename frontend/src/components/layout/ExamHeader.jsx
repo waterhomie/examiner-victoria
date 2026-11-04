@@ -58,7 +58,7 @@ export function ExamHeader({
           </select>
         </label>
         <label className="practice-select" data-tour-target="flow">
-          <span>Flow</span>
+          <span>Part</span>
           <select
             data-testid="practice-type-select"
             value={practiceType}

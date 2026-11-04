@@ -3,7 +3,7 @@ export function createInitialAppState() {
     session: null,
     draft: "",
     mode: "voice",
-    reviewBeforeSend: false,
+    reviewBeforeSend: true,
     busy: "starting",
     error: "",
     report: "",

@@ -19,7 +19,7 @@ function restoreFromSnapshot(state, snapshot) {
     practiceType: snapshot?.practiceType || session?.practice_type || "full",
     selectedPart1Topic: snapshot?.selectedPart1Topic || "",
     selectedCueCardTitle: snapshot?.selectedCueCardTitle || "",
-    reviewBeforeSend: Boolean(snapshot?.reviewBeforeSend),
+    reviewBeforeSend: snapshot?.reviewBeforeSend ?? true,
     prepEndsAt: snapshot?.prepEndsAt && snapshot.prepEndsAt > Date.now() ? snapshot.prepEndsAt : null,
     busy: "",
   };
