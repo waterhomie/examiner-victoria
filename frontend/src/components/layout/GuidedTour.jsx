@@ -100,7 +100,7 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
     mode: "Tap Mode to choose Practice or Mock.",
     "mode-choice": "Choose a mode to see what it does.",
     "mode-info": trainingMode === "practice"
-      ? "Practice: get a correction and a natural version after each answer."
+      ? "Practice: answer one question at a time. When useful, Victoria points out a key correction and offers a more natural way to say your answer. You'll see what each means beside your first feedback."
       : "Mock: follow the speaking test without feedback after every answer. Review your performance at the end.",
     flow: "Tap Part to choose what you want to practise.",
     "flow-choice": "Choose one part or the full speaking test.",

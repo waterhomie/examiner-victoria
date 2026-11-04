@@ -54,13 +54,21 @@
 }
 
 .mode-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 62px;
   padding: 0 14px;
   background: var(--soft);
-  color: var(--muted);
+  color: var(--blue);
   font-weight: 700;
   cursor: pointer;
 }
+
+.mode-button:not(:disabled) { background: #eaf2ff; border: 1px solid #cbdcf8; }
+.mode-button:disabled { color: var(--muted); }
+.mode-button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 
 .voice-composer,
 .text-composer {

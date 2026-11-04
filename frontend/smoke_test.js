@@ -83,7 +83,7 @@ function assertContextualFeedbackPlaybackHint() {
   const chatCss = readFileSync("./src/styles/chat.css", "utf8");
   assert.match(appSource, /<GuidedTour/);
   assert.match(tourSource, /Choose a mode to see what it does/);
-  assert.match(tourSource, /Practice: get a correction and a natural version/);
+  assert.match(tourSource, /When useful, Victoria points out a key correction/);
   assert.match(tourSource, /Mock: follow the speaking test/);
   assert.match(tourSource, /previousTourStep\(step, selectionKind\)/);
   assert.match(tourSource, /This selector disappears after your first Part 1 answer/);
@@ -105,7 +105,7 @@ function assertContextualFeedbackPlaybackHint() {
   assert.match(tourSource, /document\.body/);
   assert.doesNotMatch(tourSource, /tour-layer/);
   assert.doesNotMatch(chatPanelSource, /Quick guide/);
-  assert.match(messageViewsSource, /Tap Quick correction or Natural version to hear it/);
+  assert.match(messageViewsSource, /You may not need both every time/);
   assert.doesNotMatch(chatPanelSource, /Tip: tap feedback text/);
 }
 

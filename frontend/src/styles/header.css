@@ -25,7 +25,7 @@
 
 .brand-block h1 {
   margin: 3px 0 0;
-  font-size: clamp(2rem, 3.5vw, 2.7rem);
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
   line-height: 1.05;
   letter-spacing: -0.045em;
 }
@@ -69,6 +69,14 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.desktop-action-buttons:empty { display: none; }
+
+@media (min-width: 621px) {
+  .brand-block h1 { white-space: nowrap; }
+  .topbar { flex-wrap: wrap; }
+  .top-actions { margin-left: auto; align-items: center; }
 }
 
 .mobile-more-menu {
