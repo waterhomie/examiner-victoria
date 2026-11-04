@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sendTelemetryEvent, transcribeAudio } from "../api.js";
 import { createBrowserSpeechTranscriber } from "../browserSpeechTranscriber.js";
 import { createAnswerRecorder, WavRecorder } from "../recorder.js";
+import { recordingIsClearlySilent } from "../utils/audioSilence.js";
 import { friendlyError, transcriptionRecovery } from "../utils/errors.js";
 import { usePagehideCleanup, useRecordingTimer } from "./useBrowserEffects.js";
 
@@ -206,6 +207,14 @@ export function useAnswerRecording({
       }
       lastRecordingRef.current = result;
       const fastText = (await browserTranscriptPromise).trim();
+      if (await recordingIsClearlySilent(result.blob)) {
+        recordTranscriptionDiagnostic({
+          stage: "recording-clearly-silent",
+          recorderType: result.recorderType || "unknown",
+          duration: result.duration,
+        });
+        throw new Error("Clearly silent recording.");
+      }
       if (fastText && shouldTrustBrowserTranscript(fastText, result.duration)) {
         recordTranscriptionDiagnostic({
           stage: "transcription-completed",

@@ -4,6 +4,9 @@ export const INVALID_ANSWER_MESSAGE = "No clear answer was detected. Please answ
 export function transcriptionRecovery(error) {
   const message = String(error?.message || "");
   const status = error?.status;
+  if (/clearly silent recording/i.test(message)) {
+    return { message: "No sound was detected. Tap Voice to record again, or type your answer below.", retryAudio: false };
+  }
   if (/recording is too short|too short/i.test(message)) {
     return { message: "The recording was too short to detect an answer. Tap Voice to record again, or type your answer below.", retryAudio: false };
   }
