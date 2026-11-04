@@ -1,6 +1,30 @@
 export const VOICE_UNAVAILABLE_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above.";
 export const INVALID_ANSWER_MESSAGE = "No clear answer was detected. Please answer in words or try recording again.";
 
+export function transcriptionRecovery(error) {
+  const message = String(error?.message || "");
+  const status = error?.status;
+  if (/recording is too short|too short/i.test(message)) {
+    return { message: "The recording was too short to detect an answer. Tap Voice to record again, or type your answer below.", retryAudio: false };
+  }
+  if (/no clear speech was detected/i.test(message)) {
+    return { message: "No clear English answer was detected. If you spoke, please try answering in English again, or type your answer below.", retryAudio: false };
+  }
+  if (status === 413 || /too large|too long/i.test(message)) {
+    return { message: "This recording is too long. Record a shorter answer, or type it below.", retryAudio: false };
+  }
+  if (status === 429 || /too many requests/i.test(message)) {
+    return { message: "Too many requests. Please wait a moment, then try again.", retryAudio: false };
+  }
+  if (/microphone|permission|notallowed|denied|secure HTTPS|secure context|local network HTTP/i.test(message)) {
+    return { message: friendlyError(error, "Microphone access is unavailable."), retryAudio: false };
+  }
+  if (status >= 500 || /transcription|not reachable|timed out|network|failed to fetch|load failed|waking up/i.test(message)) {
+    return { message: "Audio transcription could not connect. Retry this audio, record again, or type your answer below.", retryAudio: true };
+  }
+  return { message: friendlyError(error, "Recording could not be sent."), retryAudio: false };
+}
+
 export function friendlyError(err, fallback) {
   const message = err?.message || "";
   if (/secure HTTPS|secure context|local network HTTP|isSecureContext/i.test(message)) {

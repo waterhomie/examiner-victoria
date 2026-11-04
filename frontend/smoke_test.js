@@ -26,7 +26,7 @@ import {
   getPageEnvironment,
   getRecordingSupport,
 } from "./src/utils/runtimeDiagnostics.js";
-import { INVALID_ANSWER_MESSAGE, VOICE_UNAVAILABLE_MESSAGE, friendlyError } from "./src/utils/errors.js";
+import { INVALID_ANSWER_MESSAGE, VOICE_UNAVAILABLE_MESSAGE, friendlyError, transcriptionRecovery } from "./src/utils/errors.js";
 import { getTourPosition } from "./src/components/layout/tourPosition.js";
 import { getTourSelectionKind, getTourTarget, nextTourStep, previousTourStep, TOUR_STAGES } from "./src/components/layout/tourSteps.js";
 
@@ -359,6 +359,18 @@ async function assertApiErrorMapping() {
   assert.match(friendlyError(new Error("No clear speech was detected."), "fallback"), /Type it below, or tap Voice to record again/);
   assert.match(friendlyError(new Error("Recording is too short."), "fallback"), /Type your answer below, or tap Voice to record again/);
   assert.match(friendlyError(new Error("Audio transcription failed."), "fallback"), /Type your answer below, or tap Voice to record again/);
+  assert.deepEqual(transcriptionRecovery(new Error("Recording is too short.")), {
+    message: "The recording was too short to detect an answer. Tap Voice to record again, or type your answer below.",
+    retryAudio: false,
+  });
+  assert.match(transcriptionRecovery(new Error("No clear speech was detected.")).message, /try answering in English again/);
+  assert.equal(transcriptionRecovery(new Error("No clear speech was detected.")).retryAudio, false);
+  assert.equal(transcriptionRecovery(Object.assign(new Error("Audio is too large"), { status: 413 })).retryAudio, false);
+  assert.equal(transcriptionRecovery(Object.assign(new Error("Too many requests"), { status: 429 })).retryAudio, false);
+  assert.equal(transcriptionRecovery(new Error("Microphone permission denied")).retryAudio, false);
+  assert.equal(transcriptionRecovery(Object.assign(new Error("Audio transcription is temporarily unavailable"), { status: 502 })).retryAudio, true);
+  assert.equal(transcriptionRecovery(new Error("Victoria's server is not reachable")).retryAudio, true);
+  assert.equal(transcriptionRecovery(new Error("Unexpected recording error")).retryAudio, false);
 }
 
 async function assertTtsFailureMapping() {
