@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { sendTelemetryEvent, transcribeAudio } from "../api.js";
 import { createBrowserSpeechTranscriber } from "../browserSpeechTranscriber.js";
 import { createAnswerRecorder, WavRecorder } from "../recorder.js";
-import { friendlyError } from "../utils/errors.js";
+import { friendlyError, transcriptionRecovery } from "../utils/errors.js";
 import { usePagehideCleanup, useRecordingTimer } from "./useBrowserEffects.js";
 
 function recordTranscriptionDiagnostic(details) {
@@ -22,10 +22,6 @@ function recordTranscriptionDiagnostic(details) {
 
 function countTranscriptWords(text) {
   return (text.match(/[A-Za-z']+/g) || []).length;
-}
-
-function isUnclearRecording(error) {
-  return /no clear speech was detected/i.test(String(error?.message || ""));
 }
 
 function shouldTrustBrowserTranscript(text, duration) {
@@ -261,10 +257,11 @@ export function useAnswerRecording({
       cleanupRecording();
       setElapsed(0);
       onModeChange("text");
-      const canRetry = Boolean(lastRecordingRef.current?.blob) && !isUnclearRecording(err);
+      const recovery = transcriptionRecovery(err);
+      const canRetry = Boolean(lastRecordingRef.current?.blob) && recovery.retryAudio;
       setCanRetryRecording(canRetry);
       if (!canRetry) lastRecordingRef.current = null;
-      onErrorChange(friendlyError(err, "Recording could not be sent."));
+      onErrorChange(recovery.message);
       onBusyChange("");
     }
   }, [busy, cleanupRecording, handleTranscribedAudio, onBusyChange, onErrorChange, onModeChange, recording]);
@@ -300,10 +297,11 @@ export function useAnswerRecording({
         serverTotalMs: Date.now() - serverStartedAt,
         error: String(err?.message || err),
       });
-      const canRetry = !isUnclearRecording(err);
+      const recovery = transcriptionRecovery(err);
+      const canRetry = recovery.retryAudio;
       setCanRetryRecording(canRetry);
       if (!canRetry) lastRecordingRef.current = null;
-      onErrorChange(friendlyError(err, "Recording could not be sent."));
+      onErrorChange(recovery.message);
       onBusyChange("");
     }
   }, [busy, handleTranscribedAudio, onBusyChange, onErrorChange]);

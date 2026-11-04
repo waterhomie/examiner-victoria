@@ -52,7 +52,9 @@ async function request(path, options = {}) {
     } catch (_) {
       // Some endpoints return plain text or binary.
     }
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return response;
