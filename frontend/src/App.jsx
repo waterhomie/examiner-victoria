@@ -59,15 +59,23 @@ export default function App() {
   });
 
   const {
+    beginRetake,
+    cancelRecording,
     canRetryRecording,
     cleanupRecording,
+    discardReviewedDraft,
     elapsed,
+    keepPreviousDraft,
     recording,
+    replacementDraft,
     resetRecording,
+    reviewedRecording,
     retryLastRecording,
     toggleRecording,
+    useReplacementDraft,
   } = useAnswerRecording({
     busy: state.busy,
+    draft: state.draft,
     onBusyChange: setBusy,
     onDraftChange: setDraft,
     onErrorChange: setError,
@@ -102,7 +110,7 @@ export default function App() {
     ? "Starting..."
     : state.session.test_active
       ? recording
-        ? "Tap to send"
+        ? state.reviewBeforeSend ? "Stop & review" : "Tap to send"
         : "Tap to record"
       : "Test complete";
 
@@ -309,23 +317,30 @@ export default function App() {
       {!diagnosticsOpen ? (
         <AnswerComposer
         busy={state.busy}
+        beginRetake={beginRetake}
+        cancelRecording={cancelRecording}
         canAnswer={capabilities.canAnswer}
+        discardReviewedDraft={discardReviewedDraft}
         draft={state.draft}
         elapsed={elapsed}
         formatDuration={formatDuration}
         handleTextComposerKeyDown={controller.handleTextComposerKeyDown}
         mode={state.mode}
+        keepPreviousDraft={keepPreviousDraft}
         onDraftChange={controller.setDraft}
         onModeToggle={controller.toggleInputMode}
         onReviewBeforeSendChange={controller.setReviewBeforeSend}
         recordButtonDisabled={recordButtonDisabled}
         recordButtonText={recordButtonText}
         recording={recording}
+        replacementDraft={replacementDraft}
         requestReport={controller.requestReport}
         reviewBeforeSend={state.reviewBeforeSend}
+        reviewedRecording={reviewedRecording}
         session={state.session}
         submitTypedAnswer={controller.submitTypedAnswer}
         toggleRecording={handleToggleRecording}
+        useReplacementDraft={useReplacementDraft}
         />
       ) : null}
       <GuidedTour
