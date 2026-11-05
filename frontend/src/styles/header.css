@@ -46,6 +46,8 @@
   gap: 8px;
 }
 
+.mobile-stage-row.stats-only { justify-content: flex-end; }
+
 .mobile-stats {
   display: inline-flex;
   align-items: center;

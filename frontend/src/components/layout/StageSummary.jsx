@@ -4,6 +4,7 @@ export function StageSummary({
   session,
   sessionStats,
   stageProgress,
+  showStageLabels = true,
   wide = false,
 }) {
   return (
@@ -11,13 +12,13 @@ export function StageSummary({
       className={`mobile-stage-summary${wide ? " mobile-stage-summary-wide" : ""}`}
       aria-label="Current IELTS practice status"
     >
-      <div className="mobile-stage-row">
-        <div className="stage-line">
+      <div className={`mobile-stage-row${showStageLabels ? "" : " stats-only"}`}>
+        {showStageLabels ? <div className="stage-line">
           <span className="stage-pill">{currentPhase}</span>
           <span className={`training-pill ${isPracticeMode ? "practice" : "mock"}`}>
             {isPracticeMode ? "Practice" : "Mock"}
           </span>
-        </div>
+        </div> : null}
         {session ? (
           <div className="mobile-stats" aria-label="Current practice summary">
             <strong>{sessionStats.answered}</strong> ans

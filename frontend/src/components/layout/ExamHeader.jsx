@@ -33,7 +33,7 @@ export function ExamHeader({
       <div className="brand-block">
         <div className="eyebrow">IELTS Speaking Coach</div>
         <h1>Examiner Victoria</h1>
-        {session ? <div className="header-current-stage" aria-label="Current speaking stage" data-testid="current-speaking-stage">
+        {session && practiceType === "full" ? <div className="header-current-stage" aria-label="Current speaking stage" data-testid="current-speaking-stage">
           {currentPhase} · {isPracticeMode ? "Practice" : "Mock"}
         </div> : null}
         <StageSummary
@@ -42,6 +42,7 @@ export function ExamHeader({
           session={session}
           sessionStats={sessionStats}
           stageProgress={stageProgress}
+          showStageLabels={practiceType === "full"}
         />
       </div>
       <div className="top-actions">
@@ -136,6 +137,7 @@ export function ExamHeader({
         session={session}
         sessionStats={sessionStats}
         stageProgress={stageProgress}
+        showStageLabels={practiceType === "full"}
         wide
       />
     </header>

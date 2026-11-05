@@ -40,6 +40,8 @@ try {
       const text = await page.getByTestId("message-assistant").innerText();
       assert.equal(text.includes("Part 1 Practice"), part === "full");
       assert.match(text, /Are headphones comfortable/);
+      const stageLabels = await page.locator('.stage-pill, .training-pill').count();
+      assert.equal(stageLabels > 0, part === "full");
       if (width === 390 && part === "part1" && process.env.MOBILE_LAYOUT_SCREENSHOT) {
         await page.screenshot({ path: process.env.MOBILE_LAYOUT_SCREENSHOT });
       }

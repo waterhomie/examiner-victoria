@@ -41,7 +41,7 @@ export function ChatPanel({
   downloadTranscript,
   error,
   feedbackPlayback,
-  focusedPart1Practice,
+  focusedPart,
   messages,
   mockExam,
   pendingSpeechUrl,
@@ -70,7 +70,7 @@ export function ChatPanel({
           <MessageBubble
             message={message}
             feedbackPlayback={playback}
-            hideOpeningTitle={focusedPart1Practice && index === 0 && message.phase === "part1"}
+            hideOpeningTitle={focusedPart && index === 0}
             showPlaybackHint={index === firstPlayableFeedbackIndex}
           />
         </Fragment>
