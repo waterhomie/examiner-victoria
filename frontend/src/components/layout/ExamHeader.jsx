@@ -111,7 +111,7 @@ export function ExamHeader({
             <button type="button" onClick={openRuntimeDiagnostics} data-testid="mobile-runtime-diagnostics-button">
               System check
             </button>
-            <button type="button" onClick={toggleAudioEnabled} data-testid="mobile-sound-toggle">
+            <button type="button" onClick={toggleAudioEnabled} data-testid="mobile-sound-toggle" data-tour-target="mobile-sound">
               {audioEnabled ? "Sound on" : "Sound off"}
             </button>
             {canScoreNow ? (
