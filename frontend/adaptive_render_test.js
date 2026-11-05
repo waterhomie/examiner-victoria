@@ -15,7 +15,16 @@ try {
     feedbackAdaptation: "adaptive", changePracticeType() {}, changeTrainingMode() {}, changeFeedbackAdaptation() {} };
   const header = renderToStaticMarkup(React.createElement(ExamHeader, base));
   const statusHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, currentPhase: "Part 1" }));
-  assert.match(statusHeader, /data-testid="current-speaking-stage">Part 1 · Practice/);
+  assert.doesNotMatch(statusHeader, /data-testid="current-speaking-stage"|class="stage-pill"|class="training-pill/);
+  assert.match(statusHeader, /class="mobile-stats"/);
+  const fullStatusHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, practiceType: "full", currentPhase: "Part 1" }));
+  assert.match(fullStatusHeader, /data-testid="current-speaking-stage">Part 1 · Practice/);
+  assert.match(fullStatusHeader, /class="stage-pill">Part 1/);
+  for (const practiceType of ["part2", "part3"]) {
+    const focusedHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, practiceType, currentPhase: practiceType === "part2" ? "Part 2" : "Part 3" }));
+    assert.doesNotMatch(focusedHeader, /data-testid="current-speaking-stage"|class="stage-pill"|class="training-pill/);
+    assert.match(focusedHeader, /class="mobile-stats"/);
+  }
   const activeHeader = renderToStaticMarkup(React.createElement(ExamHeader, { ...base, canScoreNow: true, canExportRecord: true }));
   assert.doesNotMatch(activeHeader, /data-testid="(?:score|export|restart)-button"/);
   assert.match(activeHeader, /data-testid="mobile-export-button"/);
@@ -86,12 +95,20 @@ try {
   assert.doesNotMatch(firstHtml, /You may not need both every time/);
   const opening = { role: "assistant", phase: "part1", content: "**Part 1 Practice**\n\nLet's talk about headphones.\n\nAre headphones comfortable?" };
   const focusedOpening = renderToStaticMarkup(React.createElement(ChatPanel, {
-    messages: [opening], focusedPart1Practice: true,
+    messages: [opening], focusedPart: true,
   }));
   const fullOpening = renderToStaticMarkup(React.createElement(ChatPanel, { messages: [opening] }));
   assert.doesNotMatch(focusedOpening, /Part 1 Practice/);
   assert.match(focusedOpening, /Are headphones comfortable/);
   assert.match(fullOpening, /Part 1 Practice/);
+  for (const [phase, heading] of [["part2_long", "Part 2 - Long Turn"], ["part3", "Part 3 - Discussion Practice"]]) {
+    const message = { role: "assistant", phase, content: `**${heading}**\n\nDescribe your answer.` };
+    const focused = renderToStaticMarkup(React.createElement(ChatPanel, { messages: [message], focusedPart: true }));
+    const full = renderToStaticMarkup(React.createElement(ChatPanel, { messages: [message] }));
+    assert.doesNotMatch(focused, new RegExp(heading));
+    assert.match(focused, /Describe your answer/);
+    assert.match(full, new RegExp(heading));
+  }
   const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" },
       { role: "user", content: "I agree." },

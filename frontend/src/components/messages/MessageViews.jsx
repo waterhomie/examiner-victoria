@@ -230,7 +230,7 @@ export function ReportView({ report }) {
 export function MessageBubble({ message, feedbackPlayback, hideOpeningTitle = false, showPlaybackHint = false }) {
   const isUser = message.role === "user";
   const content = hideOpeningTitle && !isUser
-    ? String(message.content || "").replace(/^\*\*Part 1 Practice\*\*\s*\n\s*/, "")
+    ? String(message.content || "").replace(/^\*\*Part (?:1 Practice|2 - Long Turn|3 - Discussion Practice)\*\*\s*\n\s*/, "")
     : message.content;
   const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(content) : null;
   const hasCorrection = sections?.some((section) => section.label === "Quick correction" && section.text);
