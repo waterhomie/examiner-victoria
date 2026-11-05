@@ -13,6 +13,8 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
   });
   const [rect, setRect] = useState(null);
   const [position, setPosition] = useState(null);
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 620px)").matches);
+  const [targetMissing, setTargetMissing] = useState(false);
   const popoverRef = useRef(null);
   const stage = TOUR_STAGES[step];
   const finish = () => {
@@ -20,6 +22,12 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
     setStep(TOUR_STAGES.length);
   };
   useEffect(() => { if (ready) setStarted(true); }, [ready]);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 620px)");
+    const update = () => setMobile(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   useEffect(() => {
     if (replayRequest === 0) return;
     setStarted(true);
@@ -36,13 +44,19 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
 
   useLayoutEffect(() => {
     if (!started || !ready || !stage) return;
-    const targetName = getTourTarget(stage, selectionKind);
+    const targetName = mobile && stage.startsWith("sound") ? "mobile-sound" : getTourTarget(stage, selectionKind);
     const target = targetName && document.querySelector(`[data-tour-target="${targetName}"]`);
-    if (!target) {
-      setRect(null);
+    const menu = targetName === "mobile-sound" ? target?.closest("details") : null;
+    const openedForTour = menu && !menu.open;
+    if (menu) menu.open = true;
+    const bounds = target?.getBoundingClientRect();
+    if (!target || !bounds?.width || !bounds?.height) {
+      setTargetMissing(true);
+      setRect({ top: 12, bottom: 12, left: 12, width: 0, height: 0 });
       if (stage === "selection") setStep((current) => nextTourStep(current, selectionKind));
-      return;
+      return () => { if (openedForTour) menu.open = false; };
     }
+    setTargetMissing(false);
     target.classList.add("tour-target-active");
     const update = () => setRect(target.getBoundingClientRect());
     update();
@@ -70,11 +84,12 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
       target.removeEventListener("click", advance);
       target.removeEventListener("change", advance, true);
       target.classList.remove("tour-target-active");
+      if (openedForTour) menu.open = false;
       observer.disconnect();
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [stage, step, started, ready, selectionKind]);
+  }, [stage, step, started, ready, selectionKind, mobile]);
 
   useLayoutEffect(() => {
     if (!started || !ready || !stage || !rect || !popoverRef.current) return;
@@ -97,7 +112,7 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
 
   if (!started || !ready || !stage || !rect) return null;
   const content = {
-    mode: "Tap Mode to choose Practice or Mock.",
+    mode: mobile ? "Tap the highlighted option to choose Practice or Mock." : "Tap Mode to choose Practice or Mock.",
     "mode-choice": "Choose a mode to see what it does.",
     "mode-info": trainingMode === "practice"
       ? "Practice: answer one question at a time. When useful, Victoria points out a key correction and offers a more natural way to say your answer. You'll see what each means beside your first feedback."
@@ -109,7 +124,7 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
     selection: selectionKind === "topic"
       ? "Choose a Topic or keep Random topic. Changing it starts a new session. This selector disappears after your first Part 1 answer."
       : "Choose a Topic (IELTS cue card) or keep Random topic. Changing it starts a new session.",
-    sound: "Tap Sound to turn Victoria's voice on or off.",
+    sound: mobile ? "Sound is inside More. Tap the highlighted Sound option to turn Victoria's voice on or off." : "Tap Sound to turn Victoria's voice on or off.",
     "sound-info": "You can listen to Victoria's questions or read them on screen.",
     answer: "You're ready. Tap Text to type, or tap the recording area to speak. You can cancel a recording or review and retake it before sending. Find this guide again under More → Show guide.",
   };
@@ -124,7 +139,7 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
       <div className="tour-scrim" aria-hidden="true" />
       <div className="tour-popover" role="dialog" aria-modal="true" aria-label="Quick guide" ref={popoverRef} style={position || { top: 12, left: 12, visibility: "hidden" }}>
         <strong>Quick guide · {step < 3 ? 1 : step < 7 ? 2 : step < 9 ? 3 : 4} / 4</strong>
-        <p>{content[stage]}</p>
+        <p>{targetMissing ? "This control isn't visible in the current layout. You can continue the guide or skip it." : content[stage]}</p>
         {(stage.includes("choice") || stage === "mode-info" || stage === "flow-info") ? (
           <div className="tour-choices">{options.map((item) => (
             <button key={item.value} type="button" onClick={() => choose(item.value)}>{item.label}</button>
@@ -132,7 +147,7 @@ export function GuidedTour({ ready, replayRequest, trainingMode, practiceType, t
         ) : null}
         <div className="tour-navigation">
           {step > 0 ? <button className="tour-back" type="button" onClick={() => setStep(previousTourStep(step, selectionKind))}>Back</button> : null}
-          {(stage === "mode-info" || stage === "flow-info" || stage === "selection" || stage === "sound-info") ? (
+          {(targetMissing || stage === "mode-info" || stage === "flow-info" || stage === "selection" || stage === "sound-info") && stage !== "answer" ? (
             <button type="button" onClick={() => setStep(nextTourStep(step, selectionKind))}>Next</button>
           ) : null}
           {stage === "answer" ? <button type="button" onClick={finish}>Finish guide</button>

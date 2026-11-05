@@ -420,7 +420,8 @@ blockquote {
 }
 .tour-scrim { position: fixed; inset: 0; z-index: 100; background: rgba(15, 23, 42, 0.68); pointer-events: auto; }
 .topbar:has(.tour-target-active) { position: relative; z-index: 101; }
-.topbar:has(.tour-target-active)::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(15, 23, 42, 0.68); pointer-events: auto; }
+.topbar:has(.tour-target-active)::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: rgba(15, 23, 42, 0.68); pointer-events: auto; }
+.mobile-more-panel:has(.tour-target-active)::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: rgba(15, 23, 42, 0.68); pointer-events: auto; }
 .stage-card:has(.tour-target-active) { position: relative; z-index: 101; }
 .stage-card:has(.tour-target-active)::before { content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; background: rgba(15, 23, 42, 0.68); pointer-events: auto; }
 .tour-target-active { position: relative; z-index: 101 !important; outline: 4px solid #f59e0b; outline-offset: 5px; border-radius: 14px; }
