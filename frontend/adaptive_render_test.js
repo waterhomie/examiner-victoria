@@ -45,6 +45,7 @@ try {
   assert.match(recordingComposer, /data-testid="cancel-recording-button"/);
   assert.match(recordingComposer, /aria-label="Check transcript before sending"/);
   assert.match(recordingComposer, /<span class="timer">00:01<\/span>/);
+  assert.match(recordingComposer, /record-button-label-mobile" aria-hidden="true">Send<\/span>/);
   const idleVoice = renderToStaticMarkup(React.createElement(AnswerComposer, { mode: "voice", session: { test_active: true } }));
   assert.doesNotMatch(idleVoice, /class="timer"/);
   assert.match(header, /data-testid="adaptive-feedback-toggle"[^>]*checked/);
@@ -83,6 +84,14 @@ try {
   assert.doesNotMatch(firstHtml, /Quick guide/);
   assert.doesNotMatch(firstHtml, /feedback-next-question/);
   assert.doesNotMatch(firstHtml, /You may not need both every time/);
+  const opening = { role: "assistant", phase: "part1", content: "**Part 1 Practice**\n\nLet's talk about headphones.\n\nAre headphones comfortable?" };
+  const focusedOpening = renderToStaticMarkup(React.createElement(ChatPanel, {
+    messages: [opening], focusedPart1Practice: true,
+  }));
+  const fullOpening = renderToStaticMarkup(React.createElement(ChatPanel, { messages: [opening] }));
+  assert.doesNotMatch(focusedOpening, /Part 1 Practice/);
+  assert.match(focusedOpening, /Are headphones comfortable/);
+  assert.match(fullOpening, /Part 1 Practice/);
   const standardHtml = renderToStaticMarkup(React.createElement(ChatPanel, {
     messages: [{ role: "assistant", content: "First question?" },
       { role: "user", content: "I agree." },

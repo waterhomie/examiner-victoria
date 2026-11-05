@@ -100,6 +100,8 @@
   box-shadow: 0 0 0 7px rgba(255, 75, 75, 0.14);
 }
 
+.record-button-label-mobile { display: none; }
+
 .timer {
   min-width: 48px;
   text-align: right;
