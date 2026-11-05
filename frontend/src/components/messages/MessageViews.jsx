@@ -227,9 +227,12 @@ export function ReportView({ report }) {
   );
 }
 
-export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = false }) {
+export function MessageBubble({ message, feedbackPlayback, hideOpeningTitle = false, showPlaybackHint = false }) {
   const isUser = message.role === "user";
-  const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(message.content) : null;
+  const content = hideOpeningTitle && !isUser
+    ? String(message.content || "").replace(/^\*\*Part 1 Practice\*\*\s*\n\s*/, "")
+    : message.content;
+  const sections = !isUser && feedbackPlayback ? splitFeedbackPlayback(content) : null;
   const hasCorrection = sections?.some((section) => section.label === "Quick correction" && section.text);
   const hasNaturalVersion = sections?.some((section) => section.label === "Natural version" && section.text);
   return (
@@ -278,7 +281,7 @@ export function MessageBubble({ message, feedbackPlayback, showPlaybackHint = fa
               </span> : null}
             </div>
           );
-        }) : <RichMessage content={message.content} />}
+        }) : <RichMessage content={content} />}
       </div>
     </article>
   );

@@ -434,6 +434,37 @@
   .review-toggle {
     flex: 0 0 auto;
   }
+
+  .record-button-label-desktop { display: none; }
+  .record-button-label-mobile { display: inline; white-space: nowrap; }
+
+  .composer:has(.record-button.recording) .voice-composer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 7px;
+  }
+
+  .composer:has(.record-button.recording) .record-button {
+    min-height: 50px;
+  }
+
+  .composer:has(.record-button.recording) .timer {
+    display: inline-flex;
+    min-width: 40px;
+    justify-content: center;
+  }
+
+  .composer:has(.record-button.recording) .review-toggle {
+    grid-column: 1 / -1;
+    justify-self: end;
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .composer:has(.record-button.recording) .review-toggle span {
+    max-width: none;
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 390px) {

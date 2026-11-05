@@ -291,6 +291,7 @@ export default function App() {
         downloadTranscript={controller.downloadTranscript}
         error={state.error}
         feedbackPlayback={sessionView.isPracticeMode ? { ...speechState, onPlay: playFeedback, disabled: Boolean(state.busy || recording) } : null}
+        focusedPart1Practice={sessionView.isPracticeMode && state.practiceType === "part1"}
         messages={messages}
         mockExam={sessionView.mockExam}
         pendingSpeechUrl={pendingSpeechUrl}

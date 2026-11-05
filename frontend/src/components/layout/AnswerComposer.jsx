@@ -67,7 +67,10 @@ export function AnswerComposer({
               aria-pressed={recording}
               aria-label={recording ? reviewBeforeSend ? "Stop recording and review" : "Stop recording and send" : "Start recording"}
             >
-              {recordButtonText}
+              <span className="record-button-label-desktop">{recordButtonText}</span>
+              <span className="record-button-label-mobile" aria-hidden="true">
+                {recording ? reviewBeforeSend ? "Review" : "Send" : recordButtonText}
+              </span>
             </button>
             {recording ? <span className="timer">{formatDuration(elapsed)}</span> : null}
             {recording ? <button className="cancel-recording" type="button" onClick={cancelRecording} data-testid="cancel-recording-button">Cancel</button> : null}
