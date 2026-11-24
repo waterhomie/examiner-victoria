@@ -71,7 +71,10 @@ def is_system_rewrite(session: ExamSession, answer: str) -> bool:
     for message in session.messages:
         if message.role != "assistant":
             continue
-        match = re.search(r"\*\*A natural version of your answer:\*\*\s*\n> ([^\n]+)", message.content)
+        match = re.search(
+            r"\*\*(?:Natural version|A natural version of your answer):\*\*\s*(?:>\s*)?([^\n]+)",
+            message.content,
+        )
         if match and normalized == re.sub(r"\W+", " ", match[1].lower()).strip():
             return True
     return False

@@ -514,6 +514,10 @@ class AdaptiveFeedbackTests(unittest.TestCase):
         s.messages[0].content = build_reply(None, None, ANSWER, "Next?")
         process_answer(s, ANSWER)
         self.assertEqual(s.learner_support_profile.observations, [])
+        legacy = session()
+        legacy.messages[0].content = build_reply(None, None, ANSWER, "Next?", merge_natural_version=False)
+        process_answer(legacy, ANSWER)
+        self.assertEqual(legacy.learner_support_profile.observations, [])
 
     def test_legacy_tuple_and_scoring_unchanged(self):
         self.model.return_value = "CORRECTION: NONE\nEXPRESSION_TIP: NONE\nUPGRADED_ANSWER: NONE"
