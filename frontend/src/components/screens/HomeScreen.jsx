@@ -126,7 +126,10 @@ export function HomeScreen({
               ))}
               <label className="topic-more">
                 <span className="sr-only">All {usesTopic ? "topics" : "cue cards"}</span>
-                <select value={selected} onChange={(event) => setSelected(event.target.value)} data-testid="topic-select">
+                <select value="" onChange={(event) => {
+                  const value = event.target.value;
+                  if (value) setSelected(value);
+                }} data-testid="topic-select">
                   <option value="">More…</option>
                   {pool.map((item) => (
                     <option key={item} value={item}>{item}</option>
