@@ -33,5 +33,5 @@ export const retakeStarted = (turnId) => ({ type: ACTIONS.RETAKE_STARTED, turnId
 export const retakeDone = (turnId, text, duration) => ({ type: ACTIONS.RETAKE_DONE, turnId, text, duration });
 export const reportRequested = () => ({ type: ACTIONS.REPORT_REQUESTED });
 export const reportSucceeded = (report) => ({ type: ACTIONS.REPORT_SUCCEEDED, report });
-export const reportFailed = (error) => ({ type: ACTIONS.REPORT_FAILED, error });
+export const reportFailed = (error, returnScreen = null) => ({ type: ACTIONS.REPORT_FAILED, error, returnScreen });
 export const setError = (error) => ({ type: ACTIONS.ERROR, error });

@@ -83,12 +83,13 @@ export function ReviewBody({ turn, onListen }) {
   );
 }
 
-export function ReviewScreen({ turn, index, complete, onRetake, onNext, onListen, embedded = false }) {
+export function ReviewScreen({ turn, index, complete, onRetake, onNext, onListen, onEnd, busy = "", embedded = false }) {
   if (!turn) return null;
   return (
     <main className={`screen paper review${embedded ? " is-embedded" : ""}`} data-testid="review-screen">
       <header className="bar">
         <span className="pill">Review · Q{index}</span>
+        <button className="review-end" type="button" onClick={onEnd} disabled={busy === "sending" || busy === "marking"} data-testid="review-end">End</button>
       </header>
       <div className="paper-scroll">
         <ReviewBody turn={turn} onListen={onListen} />

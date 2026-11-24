@@ -58,6 +58,25 @@ export function TypeSheet({ question, onSend, onClose }) {
   );
 }
 
+export function EndSheet({ trainingMode, answerCount, totalQuestions, onConfirm, onClose }) {
+  const mock = trainingMode === "mock";
+  return (
+    <Sheet title={mock ? "End the mock early?" : "Finish for today?"} onClose={onClose} testId="end-sheet">
+      <div className="end-sheet-body">
+        <p className="hint">{mock
+          ? `You've done ${answerCount} of ${totalQuestions} questions. A band score needs the full set — this attempt won't get one.`
+          : `I'll write your recap from your ${answerCount} answer(s) so far.`}</p>
+        <div className="end-sheet-actions">
+          <button className="btn main" type="button" onClick={onConfirm} data-testid="end-confirm">
+            {mock ? "End without a score" : "End and see recap"}
+          </button>
+          <button className="btn ghost" type="button" onClick={onClose} data-testid="end-cancel">Keep going</button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 export function SettingsSheet({ state, captionsOn, inSession, onChange, onClose, onEnd, onDownload }) {
   const [showCheck, setShowCheck] = useState(false);
   return (
@@ -97,7 +116,7 @@ export function SettingsSheet({ state, captionsOn, inSession, onChange, onClose,
               <button className="settings-link" type="button" onClick={onDownload}>
                 Download transcript <Icon name="download" size={16} />
               </button>
-              <button className="settings-link danger" type="button" onClick={onEnd} data-testid="end-session">
+              <button className="settings-link danger" type="button" onClick={onEnd} disabled={state.busy === "sending" || state.busy === "marking" || state.busy === "report" || Boolean(state.marking)} data-testid="end-session">
                 End session
               </button>
             </>

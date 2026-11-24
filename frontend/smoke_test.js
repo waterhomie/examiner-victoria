@@ -19,12 +19,15 @@ import {
   restored,
   retakeDone,
   retakeStarted,
+  reportFailed,
+  reportRequested,
   sessionStarted,
   sessionStarting,
 } from "./src/state/actions.js";
 import { appReducer } from "./src/state/appReducer.js";
 import { initialState, SCREENS } from "./src/state/initialState.js";
 import { ERROR_KINDS, friendlyError, INVALID_ANSWER_MESSAGE, transcriptionRecovery, VOICE_UNAVAILABLE_MESSAGE } from "./src/utils/errors.js";
+import { endSessionPlan } from "./src/utils/endSession.js";
 import { compareRetake, hasMarks, retakeHeadline, topFix, transcriptSegments, verdictChips } from "./src/utils/feedbackView.js";
 import { parseReport } from "./src/utils/reportView.js";
 import { analyzeUserAgent, buildDiagnosticCopyText } from "./src/utils/runtimeDiagnostics.js";
@@ -170,6 +173,11 @@ function assertReducerFlow() {
   state = appReducer(state, markingStep("ready"));
   state = appReducer(state, markingStep("done"));
   assert.equal(state.screen, SCREENS.REVIEW);
+  const beforeEarlyReport = state.session;
+  state = appReducer(state, reportRequested());
+  state = appReducer(state, reportFailed({ kind: ERROR_KINDS.GENERIC, message: "report unavailable" }, SCREENS.REVIEW));
+  assert.equal(state.screen, SCREENS.REVIEW, "early report failure returns to the previous screen");
+  assert.equal(state.session, beforeEarlyReport, "report failure keeps submitted answers");
   state = appReducer(state, retakeStarted("t1"));
   assert.equal(state.screen, SCREENS.EXAM);
   state = appReducer(state, retakeDone("t1", "I really like it.", 3));
@@ -206,6 +214,15 @@ function assertReducerFlow() {
   assert.equal(restoredState.session.learner_support_profile, profile);
   assert.equal(restoredState.screen, SCREENS.EXAM);
   assert.equal(appReducer(restoredState, goHome()).session, null);
+}
+
+function assertEarlyEndPlans() {
+  assert.equal(endSessionPlan("practice", session()).action, "home", "zero answers do not request a report");
+  assert.deepEqual(endSessionPlan("practice", session({ candidate_answers: [{ phase: "part1" }] })),
+    { answerCount: 1, totalQuestions: 4, action: "recap" });
+  const mock = session({ practice_mode: false, practice_type: "full", part1_queue: ["q2", "q3", "q4"], part3_target_count: 4,
+    candidate_answers: [{ phase: "identity" }, { phase: "part1" }] });
+  assert.deepEqual(endSessionPlan("mock", mock), { answerCount: 1, totalQuestions: 10, action: "home" });
 }
 
 async function assertApiErrorMapping() {
@@ -265,6 +282,7 @@ assertSessionView();
 assertFeedbackView();
 assertReportParsing();
 assertReducerFlow();
+assertEarlyEndPlans();
 assertBrowserGuards();
 
 console.log("Frontend smoke test passed");

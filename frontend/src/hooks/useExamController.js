@@ -27,6 +27,7 @@ import {
 } from "../state/actions.js";
 import { SCREENS } from "../state/initialState.js";
 import { buildPracticeRecordText, buildTranscriptText, downloadTextFile } from "../utils/downloads.js";
+import { endSessionPlan } from "../utils/endSession.js";
 import { ERROR_KINDS, friendlyError, isNetworkError } from "../utils/errors.js";
 import { safeDateStamp } from "../utils/format.js";
 import { saveMemo } from "../utils/memo.js";
@@ -205,7 +206,7 @@ export function useExamController({ state, dispatch, speech, recordingReset }) {
     dispatch(patch({ retake: null, screen: SCREENS.REVIEW }));
   }, [dispatch]);
 
-  async function requestReportFor(session) {
+  async function requestReportFor(session, returnScreen = null) {
     if (!session) return;
     stopCurrentAudio();
     dispatch(reportRequested());
@@ -218,18 +219,35 @@ export function useExamController({ state, dispatch, speech, recordingReset }) {
       dispatch(reportFailed({
         kind: isNetworkError(err) ? ERROR_KINDS.OFFLINE : ERROR_KINDS.GENERIC,
         message: friendlyError(err, "We couldn't make your recap."),
-      }));
+      }, returnScreen));
     }
   }
 
   const requestReport = useCallback(() => requestReportFor(stateRef.current.session), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const endSession = useCallback(() => {
+  const stopSessionMedia = useCallback(() => {
     stopCurrentAudio();
     clearPendingSpeech();
     recordingReset?.();
+  }, [clearPendingSpeech, recordingReset, stopCurrentAudio]);
+
+  const resetSession = useCallback(() => {
+    stopSessionMedia();
     dispatch(goHome());
-  }, [clearPendingSpeech, dispatch, recordingReset, stopCurrentAudio]);
+  }, [dispatch, stopSessionMedia]);
+
+  const endSession = useCallback(() => {
+    const current = stateRef.current;
+    if (current.busy === "sending" || current.busy === "marking" || current.busy === "report" || current.marking) return null;
+    const plan = endSessionPlan(current.trainingMode, current.session);
+    stopSessionMedia();
+    dispatch(patch({ sheet: "", error: null }));
+    if (plan.action === "recap") void requestReportFor(current.session, current.screen);
+    else dispatch(goHome());
+    return plan.action;
+    // requestReportFor is defined above and stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, stopSessionMedia]);
 
   const downloadTranscript = useCallback(() => {
     const session = stateRef.current.session;
@@ -255,6 +273,7 @@ export function useExamController({ state, dispatch, speech, recordingReset }) {
     loadBackendStatus,
     replayQuestion,
     requestReport,
+    resetSession,
     retryPending,
     startCall,
     startRetake,
