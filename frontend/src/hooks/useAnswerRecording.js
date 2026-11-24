@@ -3,21 +3,21 @@ import { sendTelemetryEvent, transcribeAudio } from "../api.js";
 import { createBrowserSpeechTranscriber } from "../browserSpeechTranscriber.js";
 import { createAnswerRecorder, WavRecorder } from "../recorder.js";
 import { recordingIsClearlySilent } from "../utils/audioSilence.js";
-import { friendlyError, transcriptionRecovery } from "../utils/errors.js";
+import { transcriptionRecovery } from "../utils/errors.js";
 import { usePagehideCleanup, useRecordingTimer } from "./useBrowserEffects.js";
+
+// Recording pipeline (kept from V3, proven on iOS / Android / WeChat):
+//   recorder (MediaRecorder → WAV fallback)
+//   + browser SpeechRecognition fast path (not on iOS)
+//   → silence check → trust check → server transcription fallback.
+// V4 changes: no "review before send" step, live caption callback,
+// auto-stop at `maxSeconds`, and the last recording can be played back.
 
 function recordTranscriptionDiagnostic(details) {
   if (typeof window === "undefined") return;
-  const diagnostic = {
-    at: new Date().toISOString(),
-    ...details,
-  };
+  const diagnostic = { at: new Date().toISOString(), ...details };
   window.__victoriaLastTranscription = diagnostic;
-  window.__victoriaTranscriptionHistory = [
-    ...(window.__victoriaTranscriptionHistory || []),
-    diagnostic,
-  ].slice(-10);
-  console.info("[Victoria transcription]", diagnostic);
+  window.__victoriaTranscriptionHistory = [...(window.__victoriaTranscriptionHistory || []), diagnostic].slice(-10);
   sendTelemetryEvent("transcription", diagnostic);
 }
 
@@ -25,7 +25,7 @@ function countTranscriptWords(text) {
   return (text.match(/[A-Za-z']+/g) || []).length;
 }
 
-function shouldTrustBrowserTranscript(text, duration) {
+export function shouldTrustBrowserTranscript(text, duration) {
   const words = countTranscriptWords(text);
   if (!text.trim() || words === 0) return false;
   if (duration >= 2.5 && words < 3) return false;
@@ -43,40 +43,41 @@ async function startPreferredRecorder() {
     if (recorder.kind !== "media" || !String(error?.message || "").includes("compressed audio")) {
       throw error;
     }
-
     const wavRecorder = new WavRecorder({ targetSampleRate: 16000 });
     await wavRecorder.start();
-    recordTranscriptionDiagnostic({
-      stage: "recorder-fallback",
-      from: "media",
-      to: "wav",
-      reason: error.message,
-    });
+    recordTranscriptionDiagnostic({ stage: "recorder-fallback", from: "media", to: "wav", reason: error.message });
     return wavRecorder;
   }
 }
 
-export function useAnswerRecording({
-  busy,
-  draft,
-  onBusyChange,
-  onDraftChange,
-  onErrorChange,
-  onModeChange,
-  reviewBeforeSend,
-  submitAnswer,
-}) {
+export function useAnswerRecording({ onTranscribed, onError, maxSeconds = 0, enabled = true }) {
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [canRetryRecording, setCanRetryRecording] = useState(false);
-  const [reviewedRecording, setReviewedRecording] = useState(false);
-  const [replacementDraft, setReplacementDraft] = useState("");
+  const [liveCaption, setLiveCaption] = useState("");
+  const [canRetry, setCanRetry] = useState(false);
+  const [lastRecordingUrl, setLastRecordingUrl] = useState("");
   const recorderRef = useRef(null);
   const browserSpeechRef = useRef(null);
   const lastRecordingRef = useRef(null);
   const startedAtRef = useRef(0);
+  const stoppingRef = useRef(false);
+  const onTranscribedRef = useRef(onTranscribed);
+  const onErrorRef = useRef(onError);
+
+  useEffect(() => {
+    onTranscribedRef.current = onTranscribed;
+    onErrorRef.current = onError;
+  }, [onError, onTranscribed]);
 
   useRecordingTimer(recording, startedAtRef, setElapsed);
+
+  const revokePlayback = useCallback(() => {
+    setLastRecordingUrl((url) => {
+      if (url) URL.revokeObjectURL(url);
+      return "";
+    });
+  }, []);
 
   const cleanupRecording = useCallback(() => {
     browserSpeechRef.current?.cancel?.();
@@ -88,247 +89,183 @@ export function useAnswerRecording({
   const resetRecording = useCallback(() => {
     cleanupRecording();
     lastRecordingRef.current = null;
-    setCanRetryRecording(false);
+    stoppingRef.current = false;
+    setCanRetry(false);
     setRecording(false);
+    setTranscribing(false);
     setElapsed(0);
-    setReviewedRecording(false);
-    setReplacementDraft("");
-  }, [cleanupRecording]);
+    setLiveCaption("");
+    revokePlayback();
+  }, [cleanupRecording, revokePlayback]);
 
   const cancelRecording = useCallback(() => {
-    if (!recording) return;
     cleanupRecording();
     setRecording(false);
     setElapsed(0);
-    onErrorChange("");
-  }, [cleanupRecording, onErrorChange, recording]);
-
-  const discardReviewedDraft = useCallback(() => {
-    onDraftChange("");
-    setReviewedRecording(false);
-    setReplacementDraft("");
-  }, [onDraftChange]);
-
-  const keepPreviousDraft = useCallback(() => setReplacementDraft(""), []);
-  const useReplacementDraft = useCallback(() => {
-    onDraftChange(replacementDraft);
-    setReplacementDraft("");
-  }, [onDraftChange, replacementDraft]);
-
-  const beginRetake = useCallback(() => {
-    setReplacementDraft("");
-    onModeChange("voice");
-  }, [onModeChange]);
+    setLiveCaption("");
+  }, [cleanupRecording]);
 
   useEffect(() => cleanupRecording, [cleanupRecording]);
   usePagehideCleanup(cleanupRecording);
-  useEffect(() => {
-    if (busy === "thinking") {
-      setReviewedRecording(false);
-      setReplacementDraft("");
-    }
-  }, [busy]);
 
-  const handleTranscribedAudio = useCallback(
-    async (text, duration) => {
-      if (reviewBeforeSend) {
-        if (reviewedRecording && draft.trim()) {
-          setReplacementDraft(text);
-        } else {
-          onDraftChange(text);
+  const fail = useCallback((err, stage) => {
+    recordTranscriptionDiagnostic({ stage: "transcription-failed", source: stage, error: String(err?.message || err) });
+    const recovery = transcriptionRecovery(err);
+    const retry = Boolean(lastRecordingRef.current?.blob) && recovery.retryAudio;
+    setCanRetry(retry);
+    setTranscribing(false);
+    onErrorRef.current?.({ ...recovery, canRetry: retry });
+  }, []);
+
+  const finish = useCallback(async (text, result, source) => {
+    setTranscribing(false);
+    setCanRetry(false);
+    await onTranscribedRef.current?.(text, result.duration, { source });
+  }, []);
+
+  const serverTranscribe = useCallback(async (result, stage) => {
+    const startedAt = Date.now();
+    const transcription = await transcribeAudio(result.blob);
+    const text = (transcription.text || "").trim();
+    if (!text) throw new Error("No clear speech was detected.");
+    recordTranscriptionDiagnostic({
+      stage: "transcription-completed",
+      source: stage,
+      serverTotalMs: Date.now() - startedAt,
+      stt_duration_ms: transcription.stt_duration_ms || transcription.elapsed_ms || null,
+      recorderType: result.recorderType || "unknown",
+      blobSize: result.blob.size,
+      duration: result.duration,
+    });
+    return text;
+  }, []);
+
+  const start = useCallback(async () => {
+    if (!enabled || recording || transcribing) return false;
+    try {
+      cleanupRecording();
+      revokePlayback();
+      setLiveCaption("");
+      recorderRef.current = await startPreferredRecorder();
+      const browserSpeech = createBrowserSpeechTranscriber({ language: "en-US", onUpdate: setLiveCaption });
+      let browserSpeechStatus = browserSpeech ? "available" : "unsupported";
+      if (browserSpeech) {
+        try {
+          await browserSpeech.start();
+          browserSpeechRef.current = browserSpeech;
+          browserSpeechStatus = "started";
+        } catch (_) {
+          browserSpeech.cancel?.();
+          browserSpeechRef.current = null;
+          browserSpeechStatus = "start-failed";
         }
-        setReviewedRecording(true);
-        onModeChange("text");
-        onBusyChange("");
-      } else {
-        await submitAnswer(text, "audio", duration);
       }
+      startedAtRef.current = Date.now();
+      stoppingRef.current = false;
+      setElapsed(0);
+      setRecording(true);
+      setCanRetry(false);
       lastRecordingRef.current = null;
-      setCanRetryRecording(false);
-    },
-    [draft, onBusyChange, onDraftChange, onModeChange, reviewBeforeSend, reviewedRecording, submitAnswer],
-  );
-
-  const toggleRecording = useCallback(async () => {
-    if (busy) return;
-    onErrorChange("");
-
-    if (!recording) {
-      try {
-        cleanupRecording();
-        recorderRef.current = await startPreferredRecorder();
-        const browserSpeech = createBrowserSpeechTranscriber({ language: "en-US" });
-        let browserSpeechStatus = browserSpeech ? "available" : "unsupported";
-        if (browserSpeech) {
-          try {
-            await browserSpeech.start();
-            browserSpeechRef.current = browserSpeech;
-            browserSpeechStatus = "started";
-          } catch (_) {
-            browserSpeech.cancel?.();
-            browserSpeechRef.current = null;
-            browserSpeechStatus = "start-failed";
-          }
-        }
-        startedAtRef.current = Date.now();
-        setElapsed(0);
-        setRecording(true);
-        setCanRetryRecording(false);
-        lastRecordingRef.current = null;
-        recordTranscriptionDiagnostic({
-          stage: "recording-started",
-          recorderType: recorderRef.current?.kind || "unknown",
-          recorderMimeType: recorderRef.current?.mimeType || "",
-          browserSpeech: browserSpeechStatus,
-        });
-      } catch (err) {
-        cleanupRecording();
-        onModeChange("text");
-        onErrorChange(friendlyError(err, "Microphone permission was blocked."));
-      }
-      return;
+      recordTranscriptionDiagnostic({
+        stage: "recording-started",
+        recorderType: recorderRef.current?.kind || "unknown",
+        browserSpeech: browserSpeechStatus,
+      });
+      return true;
+    } catch (err) {
+      cleanupRecording();
+      fail(err, "start");
+      return false;
     }
+  }, [cleanupRecording, enabled, fail, recording, revokePlayback, transcribing]);
 
+  const stop = useCallback(async () => {
+    if (!recording || stoppingRef.current || !recorderRef.current) return;
+    stoppingRef.current = true;
     setRecording(false);
-    onBusyChange("transcribing");
-    const transcriptionStartedAt = Date.now();
+    setTranscribing(true);
+    const startedAt = Date.now();
     try {
       const browserSpeech = browserSpeechRef.current;
       browserSpeechRef.current = null;
-      const browserTranscriptPromise = browserSpeech
-        ? browserSpeech.stop({ graceMs: 900 })
-        : Promise.resolve("");
+      const browserTranscriptPromise = browserSpeech ? browserSpeech.stop({ graceMs: 900 }) : Promise.resolve("");
       const result = await recorderRef.current.stop();
       recorderRef.current = null;
       setElapsed(0);
-      if (!result) return;
+      if (!result) {
+        setTranscribing(false);
+        return;
+      }
       if (!result.blob || result.blob.size < 1024 || !Number.isFinite(result.duration)) {
         throw new Error("Recording is too short.");
       }
       lastRecordingRef.current = result;
+      setLastRecordingUrl(URL.createObjectURL(result.blob));
       const fastText = (await browserTranscriptPromise).trim();
       if (await recordingIsClearlySilent(result.blob)) {
-        recordTranscriptionDiagnostic({
-          stage: "recording-clearly-silent",
-          recorderType: result.recorderType || "unknown",
-          duration: result.duration,
-        });
+        recordTranscriptionDiagnostic({ stage: "recording-clearly-silent", duration: result.duration });
         throw new Error("Clearly silent recording.");
       }
       if (fastText && shouldTrustBrowserTranscript(fastText, result.duration)) {
         recordTranscriptionDiagnostic({
           stage: "transcription-completed",
           source: "browser",
-        totalMs: Date.now() - transcriptionStartedAt,
-        stt_duration_ms: Date.now() - transcriptionStartedAt,
-        recorderType: result.recorderType || "unknown",
-          blobType: result.blob.type || result.mimeType || "",
-          blobSize: result.blob.size,
+          stt_duration_ms: Date.now() - startedAt,
           duration: result.duration,
         });
-        await handleTranscribedAudio(fastText, result.duration);
+        await finish(fastText, result, "browser");
         return;
       }
       if (fastText) {
         recordTranscriptionDiagnostic({
           stage: "browser-transcript-rejected",
-          reason: "too-short-for-recording-duration",
           browserWords: countTranscriptWords(fastText),
           duration: result.duration,
-          recorderType: result.recorderType || "unknown",
         });
       }
-      const serverStartedAt = Date.now();
-      const transcription = await transcribeAudio(result.blob);
-      const text = transcription.text || "";
-      if (!text.trim()) {
-        throw new Error("No clear speech was detected.");
-      }
-      recordTranscriptionDiagnostic({
-        stage: "transcription-completed",
-        source: "server",
-        totalMs: Date.now() - transcriptionStartedAt,
-        serverTotalMs: Date.now() - serverStartedAt,
-        serverElapsedMs: transcription.elapsed_ms,
-        stt_duration_ms: transcription.stt_duration_ms || transcription.elapsed_ms || null,
-        recorderType: result.recorderType || "unknown",
-        blobType: result.blob.type || result.mimeType || "",
-        blobSize: result.blob.size,
-        duration: result.duration,
-      });
-      await handleTranscribedAudio(text, result.duration);
+      const text = await serverTranscribe(result, "server");
+      await finish(text, result, "server");
     } catch (err) {
-      recordTranscriptionDiagnostic({
-        stage: "transcription-failed",
-        totalMs: Date.now() - transcriptionStartedAt,
-        error: String(err?.message || err),
-      });
       cleanupRecording();
       setElapsed(0);
-      onModeChange("text");
-      const recovery = transcriptionRecovery(err);
-      const canRetry = Boolean(lastRecordingRef.current?.blob) && recovery.retryAudio;
-      setCanRetryRecording(canRetry);
-      if (!canRetry) lastRecordingRef.current = null;
-      onErrorChange(recovery.message);
-      onBusyChange("");
+      fail(err, "server");
+    } finally {
+      stoppingRef.current = false;
     }
-  }, [busy, cleanupRecording, handleTranscribedAudio, onBusyChange, onErrorChange, onModeChange, recording]);
+  }, [cleanupRecording, fail, finish, recording, serverTranscribe]);
 
-  const retryLastRecording = useCallback(async () => {
+  const toggle = useCallback(() => (recording ? stop() : start()), [recording, start, stop]);
+
+  const retryLast = useCallback(async () => {
     const result = lastRecordingRef.current;
-    if (!result?.blob || busy) return;
-    onErrorChange("");
-    onBusyChange("transcribing");
-    const serverStartedAt = Date.now();
+    if (!result?.blob || transcribing) return;
+    setTranscribing(true);
     try {
-      const transcription = await transcribeAudio(result.blob);
-      const text = transcription.text || "";
-      if (!text.trim()) {
-        throw new Error("No clear speech was detected.");
-      }
-      recordTranscriptionDiagnostic({
-        stage: "transcription-completed",
-        source: "server-retry",
-        serverTotalMs: Date.now() - serverStartedAt,
-        serverElapsedMs: transcription.elapsed_ms,
-        stt_duration_ms: transcription.stt_duration_ms || transcription.elapsed_ms || null,
-        recorderType: result.recorderType || "unknown",
-        blobType: result.blob.type || result.mimeType || "",
-        blobSize: result.blob.size,
-        duration: result.duration,
-      });
-      await handleTranscribedAudio(text, result.duration);
+      const text = await serverTranscribe(result, "server-retry");
+      await finish(text, result, "server");
     } catch (err) {
-      recordTranscriptionDiagnostic({
-        stage: "transcription-failed",
-        source: "server-retry",
-        serverTotalMs: Date.now() - serverStartedAt,
-        error: String(err?.message || err),
-      });
-      const recovery = transcriptionRecovery(err);
-      const canRetry = recovery.retryAudio;
-      setCanRetryRecording(canRetry);
-      if (!canRetry) lastRecordingRef.current = null;
-      onErrorChange(recovery.message);
-      onBusyChange("");
+      fail(err, "server-retry");
     }
-  }, [busy, handleTranscribedAudio, onBusyChange, onErrorChange]);
+  }, [fail, finish, serverTranscribe, transcribing]);
+
+  // Part 2: the examiner stops you at two minutes.
+  useEffect(() => {
+    if (recording && maxSeconds > 0 && elapsed >= maxSeconds) void stop();
+  }, [elapsed, maxSeconds, recording, stop]);
 
   return {
-    beginRetake,
     cancelRecording,
-    canRetryRecording,
+    canRetry,
     cleanupRecording,
-    discardReviewedDraft,
     elapsed,
-    keepPreviousDraft,
+    lastRecordingUrl,
+    liveCaption,
     recording,
-    replacementDraft,
     resetRecording,
-    reviewedRecording,
-    retryLastRecording,
-    toggleRecording,
-    useReplacementDraft,
+    retryLast,
+    start,
+    stop,
+    toggle,
+    transcribing,
   };
 }

@@ -1,72 +1,37 @@
 export const ACTIONS = {
-  ANSWER_FAILED: "answer/failed",
-  ANSWER_REQUESTED: "answer/requested",
-  ANSWER_SUCCEEDED: "answer/succeeded",
-  AUDIO_TOGGLED: "audio/toggled",
-  FEEDBACK_ADAPTATION_SET: "feedback/adaptation-set",
-  BUSY_SET: "ui/busy-set",
-  CLOCK_TICK_SET: "timer/clock-tick-set",
-  DRAFT_CLEARED: "composer/draft-cleared",
-  DRAFT_SET: "composer/draft-set",
-  ERROR_SET: "ui/error-set",
-  HEALTH_LOADED: "health/loaded",
-  MODE_SET: "composer/mode-set",
-  MODE_TOGGLED: "composer/mode-toggled",
-  PRACTICE_OPTIONS_LOADED: "practice/options-loaded",
-  PREP_TIMER_SET: "timer/prep-timer-set",
-  REPORT_FAILED: "report/failed",
-  REPORT_REQUESTED: "report/requested",
-  REPORT_SUCCEEDED: "report/succeeded",
-  REVIEW_BEFORE_SEND_SET: "composer/review-before-send-set",
-  SESSION_RESTORED: "session/restored",
-  SESSION_START_FAILED: "session/start-failed",
-  SESSION_START_REQUESTED: "session/start-requested",
-  SESSION_START_SUCCEEDED: "session/start-succeeded",
-  STORAGE_READY_SET: "storage/ready-set",
+  PATCH: "PATCH",
+  RESTORED: "RESTORED",
+  HOME: "HOME",
+  SESSION_STARTING: "SESSION_STARTING",
+  SESSION_STARTED: "SESSION_STARTED",
+  SESSION_FAILED: "SESSION_FAILED",
+  ANSWER_SENDING: "ANSWER_SENDING",
+  ANSWER_SUCCEEDED: "ANSWER_SUCCEEDED",
+  ANSWER_FAILED: "ANSWER_FAILED",
+  MARKING_STEP: "MARKING_STEP",
+  NEXT_QUESTION: "NEXT_QUESTION",
+  RETAKE_STARTED: "RETAKE_STARTED",
+  RETAKE_DONE: "RETAKE_DONE",
+  REPORT_REQUESTED: "REPORT_REQUESTED",
+  REPORT_SUCCEEDED: "REPORT_SUCCEEDED",
+  REPORT_FAILED: "REPORT_FAILED",
+  ERROR: "ERROR",
 };
 
-export const answerFailed = (message) => ({ type: ACTIONS.ANSWER_FAILED, message });
-export const answerRequested = () => ({ type: ACTIONS.ANSWER_REQUESTED });
-export const answerSucceeded = (session) => ({ type: ACTIONS.ANSWER_SUCCEEDED, session });
-export const audioToggled = () => ({ type: ACTIONS.AUDIO_TOGGLED });
-export const feedbackAdaptationSet = (value) => ({ type: ACTIONS.FEEDBACK_ADAPTATION_SET, value });
-export const busySet = (busy) => ({ type: ACTIONS.BUSY_SET, busy });
-export const clockTickSet = (clockTick) => ({ type: ACTIONS.CLOCK_TICK_SET, clockTick });
-export const draftCleared = () => ({ type: ACTIONS.DRAFT_CLEARED });
-export const draftSet = (draft) => ({ type: ACTIONS.DRAFT_SET, draft });
-export const errorSet = (error) => ({ type: ACTIONS.ERROR_SET, error });
-export const healthLoaded = (healthInfo) => ({ type: ACTIONS.HEALTH_LOADED, healthInfo });
-export const modeSet = (mode) => ({ type: ACTIONS.MODE_SET, mode });
-export const modeToggled = () => ({ type: ACTIONS.MODE_TOGGLED });
-export const practiceOptionsLoaded = (practiceOptions) => ({
-  type: ACTIONS.PRACTICE_OPTIONS_LOADED,
-  practiceOptions,
-});
-export const prepTimerSet = (prepEndsAt, clockTick = Date.now()) => ({
-  type: ACTIONS.PREP_TIMER_SET,
-  prepEndsAt,
-  clockTick,
-});
-export const reportFailed = (message) => ({ type: ACTIONS.REPORT_FAILED, message });
+export const patch = (values) => ({ type: ACTIONS.PATCH, values });
+export const restored = (snapshot) => ({ type: ACTIONS.RESTORED, snapshot });
+export const goHome = () => ({ type: ACTIONS.HOME });
+export const sessionStarting = () => ({ type: ACTIONS.SESSION_STARTING });
+export const sessionStarted = (session) => ({ type: ACTIONS.SESSION_STARTED, session, now: Date.now() });
+export const sessionFailed = (error) => ({ type: ACTIONS.SESSION_FAILED, error });
+export const answerSending = (marking) => ({ type: ACTIONS.ANSWER_SENDING, marking });
+export const answerSucceeded = (data, turn) => ({ type: ACTIONS.ANSWER_SUCCEEDED, data, turn, now: Date.now() });
+export const answerFailed = (error, pendingAnswer = null) => ({ type: ACTIONS.ANSWER_FAILED, error, pendingAnswer });
+export const markingStep = (step) => ({ type: ACTIONS.MARKING_STEP, step });
+export const nextQuestion = () => ({ type: ACTIONS.NEXT_QUESTION });
+export const retakeStarted = (turnId) => ({ type: ACTIONS.RETAKE_STARTED, turnId });
+export const retakeDone = (turnId, text, duration) => ({ type: ACTIONS.RETAKE_DONE, turnId, text, duration });
 export const reportRequested = () => ({ type: ACTIONS.REPORT_REQUESTED });
 export const reportSucceeded = (report) => ({ type: ACTIONS.REPORT_SUCCEEDED, report });
-export const reviewBeforeSendSet = (reviewBeforeSend) => ({
-  type: ACTIONS.REVIEW_BEFORE_SEND_SET,
-  reviewBeforeSend,
-});
-export const sessionRestored = (snapshot) => ({ type: ACTIONS.SESSION_RESTORED, snapshot });
-export const sessionStartFailed = (message) => ({ type: ACTIONS.SESSION_START_FAILED, message });
-export const sessionStartRequested = ({
-  practiceType,
-  selectedCueCardTitle,
-  selectedPart1Topic,
-  trainingMode,
-}) => ({
-  type: ACTIONS.SESSION_START_REQUESTED,
-  practiceType,
-  selectedCueCardTitle,
-  selectedPart1Topic,
-  trainingMode,
-});
-export const sessionStartSucceeded = (session) => ({ type: ACTIONS.SESSION_START_SUCCEEDED, session });
-export const storageReadySet = (storageReady) => ({ type: ACTIONS.STORAGE_READY_SET, storageReady });
+export const reportFailed = (error) => ({ type: ACTIONS.REPORT_FAILED, error });
+export const setError = (error) => ({ type: ACTIONS.ERROR, error });

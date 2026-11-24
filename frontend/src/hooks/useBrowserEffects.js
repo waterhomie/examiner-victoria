@@ -1,199 +1,72 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { sendTelemetryEvent } from "../api.js";
 
-
-const SHORT_SCROLL_SLACK_PX = 48;
-
-
-function isMobileViewport() {
-  if (typeof window === "undefined") return false;
-  if (typeof window.matchMedia === "function") {
-    return window.matchMedia("(max-width: 620px)").matches;
-  }
-  return Number(window.innerWidth || 0) <= 620;
-}
+// V4: chat autoscroll and scroll telemetry were removed with the chat layout.
 
 
-function scrollPanelToLatest(panelRef, bottomRef, behavior) {
-  const anchor = bottomRef.current;
-  if (anchor) {
-    anchor.scrollIntoView({ behavior, block: "end", inline: "nearest" });
-    return;
-  }
-  const panel = panelRef.current;
-  panel?.scrollTo({ top: panel.scrollHeight, behavior });
-}
-
-
-function updateShortScrollSlack(panelRef, slackRef) {
-  const panel = panelRef.current;
-  const slack = slackRef?.current;
-  if (!panel || !slack) return 0;
-
-  const currentSlackHeight = slack.getBoundingClientRect?.().height || 0;
-  const naturalScrollHeight = panel.scrollHeight - currentSlackHeight;
-  const slackHeight = isMobileViewport()
-    ? Math.max(0, panel.clientHeight + SHORT_SCROLL_SLACK_PX - naturalScrollHeight)
-    : 0;
-  const nextHeight = `${Math.ceil(slackHeight)}px`;
-
-  if (slack.style.flexBasis !== nextHeight) {
-    slack.style.flexBasis = nextHeight;
-    slack.style.minHeight = nextHeight;
-  }
-
-  return Math.ceil(slackHeight);
-}
-
-
-function readScrollMetrics(panelRef, bottomRef, slackRef) {
-  const panel = panelRef.current;
-  if (!panel) return null;
-  const bottomAnchor = bottomRef.current;
-  const bottomAnchorHeight = bottomAnchor?.getBoundingClientRect?.().height || 0;
-  const shortScrollSlackHeight = slackRef?.current?.getBoundingClientRect?.().height || 0;
-  const contentBottomBeforeAnchor = bottomAnchor ? bottomAnchor.offsetTop : panel.scrollHeight;
-  const visibleSafeHeight = Math.max(0, panel.clientHeight - bottomAnchorHeight);
-  const distanceFromBottom = panel.scrollHeight - panel.clientHeight - panel.scrollTop;
-  const shouldFollowBottom = contentBottomBeforeAnchor - panel.scrollTop > visibleSafeHeight - 8;
-  const isNearBottom = distanceFromBottom <= Math.max(96, bottomAnchorHeight + 24);
-  return {
-    bottomAnchorHeight,
-    clientHeight: panel.clientHeight,
-    contentBottomBeforeAnchor,
-    distanceFromBottom,
-    isNearBottom,
-    scrollHeight: panel.scrollHeight,
-    scrollTop: panel.scrollTop,
-    shouldFollowBottom,
-    shortScrollSlackHeight,
-    visibleSafeHeight,
-  };
-}
-
-
-function shouldScrollToLatest(panelRef, bottomRef, slackRef, options, previousStateRef) {
-  const mobile = isMobileViewport();
-  if (!mobile) return true;
-
-  const answerCount = options.answerCount || 0;
-  if (answerCount === 0) return false;
-
-  const metrics = readScrollMetrics(panelRef, bottomRef, slackRef);
-  if (!metrics?.shouldFollowBottom) return false;
-
-  const previous = previousStateRef.current;
-  const messageAdded = !previous || options.messageCount > previous.messageCount;
-  const answerAdded = !previous || answerCount > previous.answerCount;
-  const lastMessageChanged = !previous || options.lastMessageKey !== previous.lastMessageKey;
-  const ordinaryStateChange = !messageAdded && !answerAdded && !lastMessageChanged;
-
-  if (ordinaryStateChange) return metrics.isNearBottom;
-  return true;
-}
-
-
-export function useAutoScrollToLatest(panelRef, bottomRef, slackRef, options) {
-  const previousStateRef = useRef(null);
-
-  useLayoutEffect(() => {
-    const mobile = isMobileViewport();
-    const behavior = mobile ? "auto" : "smooth";
-    const timers = [];
-    let frame = null;
-    const previousState = previousStateRef.current;
-    const nextState = {
-      answerCount: options.answerCount || 0,
-      lastMessageKey: options.lastMessageKey || "",
-      messageCount: options.messageCount || 0,
-    };
-    previousStateRef.current = nextState;
-
-    const runIfNeeded = (nextBehavior) => {
-      updateShortScrollSlack(panelRef, slackRef);
-      if (shouldScrollToLatest(panelRef, bottomRef, slackRef, options, { current: previousState })) {
-        scrollPanelToLatest(panelRef, bottomRef, nextBehavior);
-      }
-    };
-
-    runIfNeeded(behavior);
-    if (mobile) {
-      const runAgain = () => runIfNeeded("auto");
-      if (typeof window.requestAnimationFrame === "function") {
-        frame = window.requestAnimationFrame(runAgain);
-      } else {
-        timers.push(window.setTimeout(runAgain, 0));
-      }
-      timers.push(window.setTimeout(runAgain, 120));
-      timers.push(window.setTimeout(runAgain, 360));
-      timers.push(window.setTimeout(runAgain, 720));
-    }
-
-    return () => {
-      if (frame !== null && typeof window.cancelAnimationFrame === "function") {
-        window.cancelAnimationFrame(frame);
-      }
-      timers.forEach((timer) => window.clearTimeout(timer));
-    };
-    // The caller owns the trigger list.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, options.triggers);
-}
-
-
-export function useScrollStateTelemetry(panelRef, bottomRef, slackRef, sessionView) {
-  const lastAnswerCountRef = useRef(null);
-
+export function useMediaQuery(query) {
+  const get = () => (typeof window !== "undefined" && typeof window.matchMedia === "function"
+    ? window.matchMedia(query).matches
+    : false);
+  const [matches, setMatches] = useState(get);
   useEffect(() => {
-    const answerCount = sessionView?.answerCount || 0;
-    if (lastAnswerCountRef.current === null) {
-      lastAnswerCountRef.current = answerCount;
-      return undefined;
-    }
-    if (answerCount <= lastAnswerCountRef.current) return undefined;
-    lastAnswerCountRef.current = answerCount;
-    if (!isMobileViewport()) return undefined;
+    if (typeof window.matchMedia !== "function") return undefined;
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, [query]);
+  return matches;
+}
 
-    const timer = window.setTimeout(() => {
-      const panel = panelRef.current;
-      if (!panel) return;
-      updateShortScrollSlack(panelRef, slackRef);
-      const metrics = readScrollMetrics(panelRef, bottomRef, slackRef);
-      if (!metrics) return;
-      sendTelemetryEvent("ui-scroll-state", {
-        answerCount,
-        bottomAnchorHeight: Math.round(metrics.bottomAnchorHeight || 0),
-        clientHeight: Math.round(metrics.clientHeight || 0),
-        contentBottomBeforeAnchor: Math.round(metrics.contentBottomBeforeAnchor || 0),
-        distanceFromBottom: Math.round(metrics.distanceFromBottom || 0),
-        lastMessagePhase: sessionView.lastMessagePhase || "",
-        lastMessageRole: sessionView.lastMessageRole || "",
-        messageCount: sessionView.messageCount || 0,
-        phase: sessionView.phase || "",
-        practiceType: sessionView.practiceType || "",
-        scrollHeight: Math.round(metrics.scrollHeight || 0),
-        scrollTop: Math.round(metrics.scrollTop || 0),
-        shouldFollowBottom: Boolean(metrics.shouldFollowBottom),
-        shortScrollSlackHeight: Math.round(metrics.shortScrollSlackHeight || 0),
-        stageVisible: Boolean(sessionView.stageVisible),
-        visibleSafeHeight: Math.round(metrics.visibleSafeHeight || 0),
-      });
-    }, 420);
 
-    return () => window.clearTimeout(timer);
-  }, [
-    panelRef,
-    bottomRef,
-    slackRef,
-    sessionView?.answerCount,
-    sessionView?.lastMessagePhase,
-    sessionView?.lastMessageRole,
-    sessionView?.messageCount,
-    sessionView?.phase,
-    sessionView?.practiceType,
-    sessionView?.stageVisible,
-  ]);
+export function useOnlineStatus() {
+  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine !== false));
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+  return online;
+}
+
+
+// Desktop: hold Space to talk, release to send. Ignored while typing.
+export function useHoldToTalk({ enabled, onPress, onRelease }) {
+  const handlers = useRef({ onPress, onRelease });
+  useEffect(() => {
+    handlers.current = { onPress, onRelease };
+  }, [onPress, onRelease]);
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let held = false;
+    const typing = (event) => /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(event.target?.tagName || "") || event.target?.isContentEditable;
+    const down = (event) => {
+      if (event.code !== "Space" || event.repeat || typing(event)) return;
+      event.preventDefault();
+      held = true;
+      handlers.current.onPress?.();
+    };
+    const up = (event) => {
+      if (event.code !== "Space" || !held) return;
+      event.preventDefault();
+      held = false;
+      handlers.current.onRelease?.();
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, [enabled]);
 }
 
 

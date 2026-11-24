@@ -19,7 +19,10 @@ export function browserSpeechTranscriptionIsSupported() {
   return Boolean(getSpeechRecognitionClass());
 }
 
-export function createBrowserSpeechTranscriber({ language = DEFAULT_LANGUAGE } = {}) {
+// V4: `onUpdate(text)` receives the best live transcript for captions. It is
+// display-only; the final answer still goes through the trust check and the
+// server transcription fallback in useAnswerRecording.
+export function createBrowserSpeechTranscriber({ language = DEFAULT_LANGUAGE, onUpdate = null } = {}) {
   if (!browserSpeechTranscriptionIsSupported()) return null;
   const SpeechRecognitionClass = getSpeechRecognitionClass();
   if (!SpeechRecognitionClass) return null;
@@ -69,6 +72,13 @@ export function createBrowserSpeechTranscriber({ language = DEFAULT_LANGUAGE } =
         }
         if (latestInterim) {
           interimTranscript = latestInterim;
+        }
+        if (typeof onUpdate === "function") {
+          try {
+            onUpdate(normalizeTranscript(`${finalTranscript} ${latestInterim}`));
+          } catch (_) {
+            // Captions must never break recording.
+          }
         }
       };
 

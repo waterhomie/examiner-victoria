@@ -12,6 +12,9 @@ from .exam_flow_service import (
     handle_part3_phase,
     start_session,
 )
+from dataclasses import dataclass
+
+from .answer_feedback_service import build_answer_feedback
 from .feedback_service import build_reply, coach_spoken_answer
 from .part1_feedback_service import coach_part1_answer
 from .learner_support_service import is_focused_part1, is_system_rewrite, merge_observation
@@ -20,7 +23,18 @@ from .question_bank_service import (
     get_question_bank_summary,
 )
 from .report_service import build_fallback_report, build_report, build_session_learning_summary
-from .schemas import AnswerStats, CandidateAnswer, ChatMessage, ExamSession
+from .schemas import AnswerFeedback, AnswerStats, CandidateAnswer, ChatMessage, ExamSession
+
+
+@dataclass
+class ProcessedAnswer:
+    session: ExamSession
+    assistant_message: ChatMessage
+    spoken_text: str
+    start_prep_timer: bool
+    feedback: AnswerFeedback
+    answered_question: str
+    answered_phase: str
 
 
 def save_answer_stats(
@@ -60,6 +74,17 @@ def process_answer(
     source: str = "text",
     duration: float | None = None,
 ) -> tuple[ExamSession, ChatMessage, str, bool]:
+    """Backward-compatible wrapper kept for existing tests and callers."""
+    result = process_answer_detailed(session, answer, source=source, duration=duration)
+    return result.session, result.assistant_message, result.spoken_text, result.start_prep_timer
+
+
+def process_answer_detailed(
+    session: ExamSession,
+    answer: str,
+    source: str = "text",
+    duration: float | None = None,
+) -> ProcessedAnswer:
     phase = session.phase
     previous_question = session.current_question
     save_answer_stats(session, answer, source, duration, phase)
@@ -70,6 +95,7 @@ def process_answer(
     upgraded_answer = None
     feedback_available = True
     adaptation_notice = False
+    answer_kind = None
     include_upgrade = (
         session.practice_mode
         and session.answer_expansion_mode
@@ -82,6 +108,7 @@ def process_answer(
         result = coach_part1_answer(previous_question, answer, include_upgrade,
                                     profile if adaptive else None, is_system_rewrite(session, answer), source)
         correction, expression_tip, upgraded_answer, feedback_available = result.feedback
+        answer_kind = result.kind
         if adaptive:
             repeated = any(item.question == previous_question and item.answer.strip() == answer.strip()
                            for item in session.candidate_answers[:-1])
@@ -126,4 +153,27 @@ def process_answer(
     assistant_message = ChatMessage(role="assistant", content=reply, phase=session.phase,
                                     adaptation_notice=adaptation_notice)
     session.messages.append(assistant_message)
-    return session, assistant_message, next_content, start_prep_timer
+    stats = session.answer_stats[-1]
+    feedback = build_answer_feedback(
+        answer=answer,
+        phase=phase,
+        source=source,
+        duration=duration,
+        words_per_minute=stats.words_per_minute,
+        word_count=stats.word_count,
+        practice_mode=session.practice_mode,
+        correction=correction,
+        tip=expression_tip,
+        natural_version=upgraded_answer,
+        feedback_available=feedback_available,
+        kind=answer_kind,
+    )
+    return ProcessedAnswer(
+        session=session,
+        assistant_message=assistant_message,
+        spoken_text=next_content,
+        start_prep_timer=start_prep_timer,
+        feedback=feedback,
+        answered_question=previous_question,
+        answered_phase=phase,
+    )

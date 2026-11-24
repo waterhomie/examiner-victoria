@@ -124,10 +124,54 @@ class AnswerRequest(BaseModel):
     duration: float | None = None
 
 
+class AnswerCorrection(BaseModel):
+    sentence: str
+    quote: str | None = None
+    replacement: str | None = None
+    quote_in_answer: bool = False
+
+
+class AnswerEdit(BaseModel):
+    op: Literal["equal", "delete", "insert", "replace"]
+    text: str
+    replacement: str | None = None
+
+
+class AnswerHesitation(BaseModel):
+    kind: Literal["filler", "repeat"]
+    text: str
+    word_index: int
+
+
+class AnswerFeedback(BaseModel):
+    """V4 structured view of the per-answer feedback (UI only, no new model call)."""
+
+    mode: Literal["practice", "mock"] = "practice"
+    coaching: bool = False
+    available: bool = False
+    kind: str | None = None
+    correction: AnswerCorrection | None = None
+    tip: str | None = None
+    natural_version: str | None = None
+    edits: list[AnswerEdit] = Field(default_factory=list)
+    hesitations: list[AnswerHesitation] = Field(default_factory=list)
+    hesitation_count: int = 0
+    word_count: int = 0
+    duration: float | None = None
+    words_per_minute: float | None = None
+    pace: Literal["slow", "good", "fast"] | None = None
+
+
 class AnswerResponse(BaseModel):
     session: ExamSession
     assistant_message: ChatMessage
     spoken_text: str
+    # V4: structured feedback for the review screen. ``assistant_message`` is
+    # kept for backward compatibility and remains the canonical text.
+    feedback: AnswerFeedback | None = None
+    # V4: the question the candidate just answered (for review headers).
+    answered_question: str | None = None
+    answered_phase: str | None = None
     start_prep_timer: bool = False
     llm_duration_ms: int | None = None
     total_duration_ms: int | None = None

@@ -57,5 +57,5 @@ def question_bank() -> dict[str, int]:
 
 
 @router.get("/practice-options")
-def practice_options() -> dict[str, list]:
+def practice_options() -> dict:
     return get_practice_options()

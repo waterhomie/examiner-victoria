@@ -121,6 +121,12 @@ MAX_TTS_CHARS = get_positive_int("MAX_TTS_CHARS", TTS_MAX_TEXT_CHARS)
 TTS_TIMEOUT_SECONDS = get_positive_int("TTS_TIMEOUT_SECONDS", 10)
 TELEMETRY_MAX_EVENTS = get_positive_int("TELEMETRY_MAX_EVENTS", 500)
 ADMIN_TOKEN = get_secret("ADMIN_TOKEN", "")
+# V4: opt-in per-request timeout for chat completions. 0 keeps the SDK default
+# (unchanged provider behaviour). Recommended production value: 45-60.
+LLM_TIMEOUT_SECONDS = get_float("LLM_TIMEOUT_SECONDS", 0.0)
+# V4: only trust X-Forwarded-For when the app runs behind a known proxy
+# (e.g. CloudBase Run). Off by default so clients cannot spoof their IP.
+TRUST_PROXY_HEADERS = get_secret("TRUST_PROXY_HEADERS", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 def get_public_environment_name() -> str:
     raw = get_secret("APP_ENV") or get_secret("ENVIRONMENT") or get_secret("RAILWAY_ENVIRONMENT") or "development"

@@ -67,6 +67,12 @@ backend/
     Spoken-answer correction, expression tips, natural-answer upgrade logic,
     and reply assembly.
 
+  answer_feedback_service.py
+    V4 structured answer feedback for the coach UI. Deterministic, no model
+    calls: word diff (answer vs natural version), filler/repeat hesitations,
+    pace label, and the parsed correction quote. Practice only; Mock and the
+    identity phase return `coaching=false`. Tested by `answer_feedback_test.py`.
+
   part3_service.py
     Part 3 dynamic follow-up generation, fallback questions, Part 3 question
     count rules, and single-question extraction from model output.
@@ -112,6 +118,8 @@ backend/
 - Model name, base URL, API key loading, provider client: `ai_provider.py`.
 - Audio transcription or Victoria voice playback: `audio_services.py`.
 - Spoken correction or natural-answer upgrade rules: `feedback_service.py`.
+- Structured `feedback` object on `/api/answer` (edits, hesitations, pace):
+  `answer_feedback_service.py`; `engine.process_answer_detailed` assembles it.
 - Question-bank source data and exports: `question_bank/`; selection, app fallback cards, and counts: `question_bank_service.py`.
 - Final report format or scoring-summary fallback: `report_service.py`.
 - Mobile performance monitoring or telemetry summaries: `telemetry_service.py`

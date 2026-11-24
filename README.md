@@ -1,6 +1,8 @@
 # Examiner Victoria
 
-> **V3 Beta | AI IELTS Speaking Coach**
+> **V3 Beta | AI IELTS Speaking Coach** — V4 coach UI in development on branch `v4/coach-ui`
+
+> **V4 (in development).** Branch `v4/coach-ui` replaces the chat-stream UI with a screen-based coach flow (call → question → marking → review → retake → recap), adds a structured `feedback` object to `/api/answer`, and keeps the mature V3 mechanisms (recording, STT fallback, TTS, question bank, Prompt, scoring, Practice/Mock rules). See [V4 Handoff](docs/V4_HANDOFF.md). V3 Beta below remains the released line until V4 is merged.
 
 Examiner Victoria is a mobile-friendly IELTS Speaking practice application. It combines structured Practice and Mock flows with recording, transcription, AI feedback, spoken examiner prompts, reports, and lightweight anonymous feedback.
 
@@ -79,6 +81,7 @@ V3 Beta intentionally does not add accounts, cross-device identity, a persistent
 
 ## Documentation
 
+- [V4 Handoff](docs/V4_HANDOFF.md) — V4 coach UI scope, API changes, open decisions
 - [V3 Current Status](docs/V3_CURRENT_STATUS.md) — authoritative current state
 - [User Feedback Log](docs/USER_FEEDBACK_LOG.md) — tester evidence and decisions
 - [V3 Beta Constraints](docs/V3_BETA_CONSTRAINTS.md) — active scope and cost boundaries

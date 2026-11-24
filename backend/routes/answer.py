@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from ..core.payload_limits import enforce_payload_limits
 from ..core.rate_limit import enforce_rate_limit
-from ..engine import process_answer
+from ..engine import process_answer_detailed
 from ..schemas import AnswerRequest, AnswerResponse
 
 
@@ -30,12 +30,13 @@ def answer_question(request_body: AnswerRequest, request: Request) -> AnswerResp
     if not answer_has_language_content(answer):
         raise HTTPException(status_code=422, detail=INVALID_ANSWER_MESSAGE)
     started_at = time.perf_counter()
-    session, assistant_message, spoken_text, start_prep_timer = process_answer(
+    result = process_answer_detailed(
         request_body.session,
         answer,
         source=request_body.source,
         duration=request_body.duration,
     )
+    session = result.session
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
     logger.info(
         "Answer processed: phase=%s source=%s answer_stage_duration_ms=%s messages=%s",
@@ -46,9 +47,12 @@ def answer_question(request_body: AnswerRequest, request: Request) -> AnswerResp
     )
     return AnswerResponse(
         session=session,
-        assistant_message=assistant_message,
-        spoken_text=spoken_text,
-        start_prep_timer=start_prep_timer,
+        assistant_message=result.assistant_message,
+        spoken_text=result.spoken_text,
+        start_prep_timer=result.start_prep_timer,
+        feedback=result.feedback,
+        answered_question=result.answered_question,
+        answered_phase=result.answered_phase,
         llm_duration_ms=elapsed_ms,
         total_duration_ms=elapsed_ms,
     )

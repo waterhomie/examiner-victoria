@@ -1,0 +1,41 @@
+/* Examiner Victoria · V2.2 color tokens
+   All text pairs below meet WCAG AA (4.5:1 for body text, 3:1 for icons/large text). */
+:root {
+  /* Surfaces: two moments */
+  --ev-ink: #0E1424;          /* speaking moment · primary button   | white text 18.4 */
+  --ev-ink-text-2: #A3A8C4;   /* secondary text on ink              | 7.8 */
+  --ev-paper: #F7F5F0;        /* review moment · page background    */
+  --ev-card: #FFFFFF;
+  --ev-line: #E4E0D6;
+  --ev-text: #1F2433;         /* body text on paper                 | 14.2 */
+  --ev-text-2: #6B7080;       /* secondary text on paper            | 4.5 */
+  --ev-filler: #76726A;       /* fillers in transcript, use italic  | 4.8 on white */
+
+  /* Ember: microphone and "current" only */
+  --ev-ember-1: #E8663A;      /* gradient start · white icon 3.3 */
+  --ev-ember-2: #D63F27;      /* gradient end   · white text 4.6 */
+  --ev-ember-on-ink: #FF9C70; /* "YOUR TURN" text on ink | 9.0 */
+
+  /* Semantic: one meaning each */
+  --ev-rose: #B42328;  --ev-rose-soft: #FDECEC;   /* deletion / issue type | 5.7 */
+  --ev-mint: #0A7552;  --ev-mint-soft: #E2F5EE;   /* insertion / correct   | 5.0 */
+  --ev-amber: #8A5600; --ev-amber-soft: #FFF3DC;  /* uncertain / not heard | 5.6 */
+  --ev-indigo: #4B4BD8; --ev-indigo-soft: #ECECFE;/* listen / expandable   | 5.5 */
+  --ev-neutral: #666666; --ev-neutral-soft: #EFEDE7; /* descriptive, no judgement | 4.9 */
+
+  /* Victoria avatar */
+  --ev-avatar: linear-gradient(150deg, #5858E0, #3E3EC4); /* white monogram >= 4.5 */
+}
+
+/* V4 additions (not colours): type, radius, layout */
+:root {
+  --ev-ink-raised: #1B2340;
+  --ev-ink-line: rgba(255, 255, 255, 0.12);
+  --ev-ink-glow: #26305A;
+  --ev-violet-on-ink: #A9AEFF; /* kicker text on ink | 8.4 */
+  --ev-serif: Georgia, "Noto Serif CJK SC", "Songti SC", serif;
+  --ev-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  --ev-radius: 16px;
+  --ev-phone-max: 480px;
+  --ev-safe-bottom: env(safe-area-inset-bottom, 0px);
+}

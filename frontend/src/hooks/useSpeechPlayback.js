@@ -191,12 +191,24 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
         setSpeechState({ text, status: "pending" });
 
         if (!/play|autoplay|notallowed/i.test(err?.message || "")) {
-          onErrorChange("Victoria's voice is ready, but the browser needs a tap before it can play.");
+          onErrorChange("Tap Replay to hear Victoria.");
         }
       }
     },
     [audioEnabled, clearPendingSpeech, getSpeechBlob, onErrorChange, playAudioUrl, stopCurrentAudio, unlockAudio],
   );
+
+  // V4: warm the cache while the marking screen is shown, so "Next" plays at
+  // once. Uses the same TTS request that playSpeech would make later.
+  const prefetchSpeech = useCallback(async (text, sessionId = "") => {
+    if (!audioEnabled || !text) return false;
+    try {
+      await getSpeechBlob(text, sessionId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }, [audioEnabled, getSpeechBlob]);
 
   const playPendingSpeech = useCallback(async () => {
     if (!pendingSpeechUrl) return;
@@ -219,7 +231,7 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
       setPendingSpeechUrl(url);
       setPendingSpeechText(text);
       setSpeechState({ text, status: "pending" });
-      onErrorChange("Audio still could not play. Please check Safari's sound mode and tap Play Victoria again.");
+      onErrorChange("Sound still can't play. Check silent mode, then tap Replay.");
     }
   }, [onErrorChange, pendingSpeechText, pendingSpeechUrl, playAudioUrl, stopCurrentAudio]);
 
@@ -229,6 +241,7 @@ export function useSpeechPlayback({ audioEnabled, onErrorChange }) {
     pendingSpeechUrl,
     playPendingSpeech,
     playSpeech,
+    prefetchSpeech,
     unlockAudio,
     stopCurrentAudio,
   };

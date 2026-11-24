@@ -1,309 +1,263 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   buildReport,
   fetchPracticeOptions,
   healthCheck,
-  sendTelemetryEvent,
   sendAnswer,
+  sendTelemetryEvent,
   startSession,
 } from "../api.js";
-import { DEFAULT_SETTINGS, STORAGE_KEY } from "../config/appConfig.js";
+import { DEFAULT_SETTINGS, MEMO_KEY } from "../config/appConfig.js";
 import {
   answerFailed,
-  answerRequested,
+  answerSending,
   answerSucceeded,
-  audioToggled,
-  busySet,
-  clockTickSet,
-  draftSet,
-  errorSet,
-  feedbackAdaptationSet,
-  healthLoaded,
-  modeSet,
-  modeToggled,
-  practiceOptionsLoaded,
-  prepTimerSet,
+  goHome,
+  markingStep,
+  nextQuestion,
+  patch,
   reportFailed,
   reportRequested,
   reportSucceeded,
-  reviewBeforeSendSet,
-  sessionStartFailed,
-  sessionStartRequested,
-  sessionStartSucceeded,
+  retakeDone,
+  retakeStarted,
+  sessionFailed,
+  sessionStarted,
+  sessionStarting,
 } from "../state/actions.js";
+import { SCREENS } from "../state/initialState.js";
 import { buildPracticeRecordText, buildTranscriptText, downloadTextFile } from "../utils/downloads.js";
-import { friendlyError } from "../utils/errors.js";
+import { ERROR_KINDS, friendlyError, isNetworkError } from "../utils/errors.js";
 import { safeDateStamp } from "../utils/format.js";
-import { loadSavedSession } from "../utils/sessionStorage.js";
+import { saveMemo } from "../utils/memo.js";
+import { parseReport } from "../utils/reportView.js";
+import { displayQuestion, fitForSpeech, isSessionComplete, speakableText } from "../utils/sessionView.js";
 
-function part2PrepEndsAt() {
-  return Date.now() + 60_000;
+const READY_HOLD_MS = 700;
+
+function lastAssistantText(session) {
+  const messages = session?.messages || [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === "assistant") return messages[index].content;
+  }
+  return session?.current_question || "";
 }
 
-export function useExamController({
-  canAnswer,
-  clearPendingSpeech,
-  dispatch,
-  playSpeech,
-  resetRecording,
-  state,
-  stopCurrentAudio,
-  unlockAudio,
-}) {
-  const {
-    draft,
-    practiceType,
-    report,
-    selectedCueCardTitle,
-    selectedPart1Topic,
-    session,
-    trainingMode,
-  } = state;
+function newTurnId() {
+  return `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
-  const setBusy = useCallback((busy) => dispatch(busySet(busy)), [dispatch]);
-  const setClockTick = useCallback((clockTick) => dispatch(clockTickSet(clockTick)), [dispatch]);
-  const setDraft = useCallback((nextDraft) => dispatch(draftSet(nextDraft)), [dispatch]);
-  const setError = useCallback((error) => dispatch(errorSet(error)), [dispatch]);
-  const setMode = useCallback((mode) => dispatch(modeSet(mode)), [dispatch]);
-  const setPrepEndsAt = useCallback((endsAt) => dispatch(prepTimerSet(endsAt, Date.now())), [dispatch]);
-  const setReviewBeforeSend = useCallback(
-    (reviewBeforeSend) => dispatch(reviewBeforeSendSet(reviewBeforeSend)),
-    [dispatch],
-  );
-  const toggleInputMode = useCallback(() => dispatch(modeToggled()), [dispatch]);
+export function useExamController({ state, dispatch, speech, recordingReset }) {
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
-  const restoreSavedSession = useCallback(() => loadSavedSession(STORAGE_KEY), []);
+  const { playSpeech, prefetchSpeech, stopCurrentAudio, clearPendingSpeech, unlockAudio } = speech;
+
+  // Pass the session id explicitly right after a dispatch: stateRef is only
+  // updated on the next render, and the backend TTS limiter is per session.
+  const speak = useCallback((text, options = {}) => {
+    const { sessionId, ...playOptions } = options;
+    const clean = fitForSpeech(speakableText(text));
+    if (!clean) return;
+    void playSpeech(clean, sessionId || stateRef.current.session?.session_id, playOptions);
+  }, [playSpeech]);
 
   const loadBackendStatus = useCallback(async () => {
     const [health, options] = await Promise.allSettled([healthCheck(), fetchPracticeOptions()]);
-    if (health.status === "fulfilled") {
-      dispatch(healthLoaded(health.value));
-    }
-    if (options.status === "fulfilled") {
-      dispatch(practiceOptionsLoaded(options.value));
-    }
+    dispatch(patch({
+      ...(health.status === "fulfilled" ? { health: health.value } : { health: { status: "unreachable" } }),
+      ...(options.status === "fulfilled" ? { practiceOptions: { ...stateRef.current.practiceOptions, ...options.value } } : {}),
+    }));
   }, [dispatch]);
 
-  const createFreshSession = useCallback(
-    async (
-      nextPracticeType = practiceType,
-      nextPart1Topic = selectedPart1Topic,
-      nextCueCardTitle = selectedCueCardTitle,
-      nextTrainingMode = trainingMode,
-    ) => {
-      stopCurrentAudio();
-      clearPendingSpeech();
-      resetRecording?.();
-      const nextIsPracticeMode = nextTrainingMode === "practice";
-      dispatch(
-        sessionStartRequested({
-          practiceType: nextPracticeType,
-          selectedCueCardTitle: nextCueCardTitle,
-          selectedPart1Topic: nextPart1Topic,
-          trainingMode: nextTrainingMode,
-        }),
-      );
-      try {
-        const health = await healthCheck();
-        dispatch(healthLoaded(health));
-        const data = await startSession({
-          ...DEFAULT_SETTINGS,
-          practice_mode: nextIsPracticeMode,
-          answer_expansion_mode: nextIsPracticeMode,
-          practice_type: nextPracticeType,
-          part1_topic: nextPart1Topic || null,
-          cue_card_title: nextCueCardTitle || null,
-          feedback_adaptation: nextIsPracticeMode && nextPracticeType === "part1" ? state.feedbackAdaptation : "standard",
-        });
-        dispatch(sessionStartSucceeded(data.session));
-        if (data.session.phase === "part2_long") {
-          dispatch(prepTimerSet(part2PrepEndsAt(), Date.now()));
-        }
-      } catch (err) {
-        dispatch(sessionStartFailed(friendlyError(err, "Failed to start session.")));
-      }
-    },
-    [
-      clearPendingSpeech,
-      dispatch,
-      practiceType,
-      resetRecording,
-      selectedCueCardTitle,
-      selectedPart1Topic,
-      stopCurrentAudio,
-      trainingMode,
-      state.feedbackAdaptation,
-    ],
-  );
-
-  const toggleAudioEnabled = useCallback(() => {
-    if (state.audioEnabled) {
-      stopCurrentAudio();
-      clearPendingSpeech();
+  // Called from the "Call Victoria" tap, so the iOS audio unlock runs inside
+  // the user gesture before any await.
+  const startCall = useCallback(async () => {
+    const current = stateRef.current;
+    unlockAudio(true);
+    stopCurrentAudio();
+    clearPendingSpeech();
+    recordingReset?.();
+    dispatch(sessionStarting());
+    const practice = current.trainingMode === "practice";
+    try {
+      const data = await startSession({
+        ...DEFAULT_SETTINGS,
+        voice_playback_enabled: current.audioEnabled,
+        practice_mode: practice,
+        answer_expansion_mode: practice,
+        practice_type: current.practiceType,
+        part1_topic: current.practiceType === "part1" ? current.part1Topic || null : null,
+        cue_card_title: ["part2", "part3"].includes(current.practiceType) ? current.cueCardTitle || null : null,
+        feedback_adaptation: practice && current.practiceType === "part1" ? current.feedbackAdaptation : "standard",
+      });
+      const spoken = lastAssistantText(data.session);
+      dispatch(sessionStarted(data.session));
+      dispatch(patch({ nextSpeech: spoken }));
+      speak(spoken, { sessionId: data.session.session_id });
+    } catch (err) {
+      dispatch(sessionFailed({
+        kind: isNetworkError(err) ? ERROR_KINDS.OFFLINE : ERROR_KINDS.GENERIC,
+        message: friendlyError(err, "We couldn't start the call."),
+      }));
     }
-    dispatch(audioToggled());
-  }, [clearPendingSpeech, dispatch, state.audioEnabled, stopCurrentAudio]);
+  }, [clearPendingSpeech, dispatch, recordingReset, speak, stopCurrentAudio, unlockAudio]);
 
-  const changeFeedbackAdaptation = useCallback((event) => {
-    dispatch(feedbackAdaptationSet(event.target.checked ? "adaptive" : "standard"));
+  const submitAnswer = useCallback(async (answer, source = "text", duration = null) => {
+    const current = stateRef.current;
+    const session = current.session;
+    const cleaned = String(answer || "").trim();
+    if (!cleaned || !session || current.busy === "sending") return;
+    const question = displayQuestion(session);
+    const startedAt = Date.now();
+    stopCurrentAudio();
+    clearPendingSpeech();
+    dispatch(answerSending({ question, phase: session.phase, transcript: cleaned, source, duration }));
+    try {
+      const data = await sendAnswer({ session, answer: cleaned, source, duration });
+      sendTelemetryEvent("answer", {
+        source,
+        phase: session.phase,
+        answerDuration: duration || 0,
+        llm_duration_ms: data.llm_duration_ms || null,
+        total_duration_ms: Date.now() - startedAt,
+      });
+      const turn = {
+        id: newTurnId(),
+        question: data.answered_question ? displayQuestion({ ...session, current_question: data.answered_question }) : question,
+        phase: data.answered_phase || session.phase,
+        answer: cleaned,
+        source,
+        duration,
+        feedback: data.feedback || null,
+        retakes: [],
+      };
+      dispatch(answerSucceeded(data, turn));
+      const coaching = Boolean(data.feedback?.coaching);
+      const complete = isSessionComplete(data.session);
+      if (coaching) {
+        if (!complete && stateRef.current.audioEnabled) {
+          await prefetchSpeech(fitForSpeech(speakableText(data.spoken_text)), data.session?.session_id);
+        }
+        dispatch(markingStep("ready"));
+        window.setTimeout(() => dispatch(markingStep("done")), READY_HOLD_MS);
+      } else if (complete) {
+        void requestReportFor(data.session);
+      } else {
+        speak(data.spoken_text, { sessionId: data.session?.session_id });
+      }
+    } catch (err) {
+      sendTelemetryEvent("answer-error", { source, phase: session.phase, message: String(err?.message || err) });
+      const offline = isNetworkError(err);
+      dispatch(answerFailed(
+        {
+          kind: offline ? ERROR_KINDS.OFFLINE : ERROR_KINDS.GENERIC,
+          message: friendlyError(err, "Victoria couldn't reply."),
+        },
+        offline ? { answer: cleaned, source, duration } : null,
+      ));
+    }
+    // requestReportFor is defined below and stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearPendingSpeech, dispatch, prefetchSpeech, speak, stopCurrentAudio]);
+
+  const retryPending = useCallback(() => {
+    const pending = stateRef.current.pendingAnswer;
+    if (pending) void submitAnswer(pending.answer, pending.source, pending.duration);
+  }, [submitAnswer]);
+
+  const discardPending = useCallback(() => {
+    dispatch(patch({ pendingAnswer: null, error: null, marking: null, screen: SCREENS.EXAM }));
   }, [dispatch]);
 
-  const changePracticeType = useCallback(
-    (event) => {
-      const nextPracticeType = event.target.value;
-      if (nextPracticeType === practiceType && session) return;
-      void createFreshSession(nextPracticeType, selectedPart1Topic, selectedCueCardTitle, trainingMode);
-    },
-    [createFreshSession, practiceType, selectedCueCardTitle, selectedPart1Topic, session, trainingMode],
-  );
+  const goNext = useCallback(() => {
+    const current = stateRef.current;
+    unlockAudio(true);
+    dispatch(nextQuestion());
+    if (isSessionComplete(current.session)) {
+      if (!current.report && current.reportStatus !== "loading") void requestReportFor(current.session);
+      return;
+    }
+    speak(current.nextSpeech);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, speak, unlockAudio]);
 
-  const changeTrainingMode = useCallback(
-    (event) => {
-      const nextTrainingMode = event.target.value;
-      if (nextTrainingMode === trainingMode && session) return;
-      void createFreshSession(practiceType, selectedPart1Topic, selectedCueCardTitle, nextTrainingMode);
-    },
-    [createFreshSession, practiceType, selectedCueCardTitle, selectedPart1Topic, session, trainingMode],
-  );
+  const replayQuestion = useCallback(() => {
+    const current = stateRef.current;
+    speak(current.nextSpeech || lastAssistantText(current.session), { manual: true });
+  }, [speak]);
 
-  const changePart1Topic = useCallback(
-    (event) => {
-      void createFreshSession(practiceType, event.target.value, selectedCueCardTitle, trainingMode);
-    },
-    [createFreshSession, practiceType, selectedCueCardTitle, trainingMode],
-  );
+  const listen = useCallback((text) => speak(text, { manual: true }), [speak]);
 
-  const changeCueCardTitle = useCallback(
-    (event) => {
-      void createFreshSession(practiceType, selectedPart1Topic, event.target.value, trainingMode);
-    },
-    [createFreshSession, practiceType, selectedPart1Topic, trainingMode],
-  );
+  const startRetake = useCallback((turnId) => {
+    stopCurrentAudio();
+    dispatch(retakeStarted(turnId));
+  }, [dispatch, stopCurrentAudio]);
 
-  const submitAnswer = useCallback(
-    async (answer, source = "text", duration = null, options = {}) => {
-      const cleaned = answer.trim();
-      if (!cleaned || !session) return;
-      const answerStartedAt = Date.now();
-      const answerPhase = session.phase;
-      dispatch(answerRequested());
-      resetRecording?.();
-      if (!options.audioPrepared) {
-        stopCurrentAudio();
-      }
-      clearPendingSpeech();
-      try {
-        const data = await sendAnswer({
-          session,
-          answer: cleaned,
-          source,
-          duration,
-        });
-        sendTelemetryEvent("answer", {
-          durationMs: Date.now() - answerStartedAt,
-          source,
-          answerDuration: duration || 0,
-          phase: answerPhase,
-          messageCount: session.messages?.length || 0,
-          llm_duration_ms: data.llm_duration_ms || null,
-          total_duration_ms: Date.now() - answerStartedAt,
-        });
-        dispatch(answerSucceeded(data.session));
-        if (data.start_prep_timer) {
-          dispatch(prepTimerSet(part2PrepEndsAt(), Date.now()));
-        }
-        void playSpeech(data.spoken_text, data.session?.session_id);
-      } catch (err) {
-        sendTelemetryEvent("answer-error", {
-          durationMs: Date.now() - answerStartedAt,
-          source,
-          answerDuration: duration || 0,
-          phase: answerPhase,
-          message: String(err?.message || err),
-        });
-        dispatch(answerFailed(friendlyError(err, "Victoria could not respond.")));
-      }
-    },
-    [clearPendingSpeech, dispatch, playSpeech, resetRecording, session, stopCurrentAudio],
-  );
+  const finishRetake = useCallback((text, duration) => {
+    const retake = stateRef.current.retake;
+    if (retake) dispatch(retakeDone(retake.turnId, text, duration));
+  }, [dispatch]);
 
-  const submitTypedAnswer = useCallback(
-    async (event) => {
-      event?.preventDefault();
-      stopCurrentAudio();
-      unlockAudio();
-      await submitAnswer(draft, "text", null, { audioPrepared: true });
-    },
-    [draft, stopCurrentAudio, submitAnswer, unlockAudio],
-  );
+  const cancelRetake = useCallback(() => {
+    dispatch(patch({ retake: null, screen: SCREENS.REVIEW }));
+  }, [dispatch]);
 
-  const handleTextComposerKeyDown = useCallback(
-    (event) => {
-      if (event.key !== "Enter" || event.shiftKey || event.nativeEvent?.isComposing) return;
-      event.preventDefault();
-      if (draft.trim() && canAnswer) {
-        stopCurrentAudio();
-        unlockAudio();
-        void submitAnswer(draft, "text", null, { audioPrepared: true });
-      }
-    },
-    [canAnswer, draft, stopCurrentAudio, submitAnswer, unlockAudio],
-  );
-
-  const requestReport = useCallback(async () => {
+  async function requestReportFor(session) {
     if (!session) return;
     stopCurrentAudio();
     dispatch(reportRequested());
     try {
       const data = await buildReport(session);
       dispatch(reportSucceeded(data.report));
+      const parsed = parseReport(data.report);
+      if (parsed.oneThing) saveMemo(MEMO_KEY, parsed.oneThing);
     } catch (err) {
-      dispatch(reportFailed(friendlyError(err, "Report could not be generated.")));
+      dispatch(reportFailed({
+        kind: isNetworkError(err) ? ERROR_KINDS.OFFLINE : ERROR_KINDS.GENERIC,
+        message: friendlyError(err, "We couldn't make your recap."),
+      }));
     }
-  }, [dispatch, session, stopCurrentAudio]);
+  }
 
-  const downloadReport = useCallback(() => {
-    if (!report) return;
-    downloadTextFile(`examiner-victoria-report-${safeDateStamp()}.txt`, report);
-  }, [report]);
+  const requestReport = useCallback(() => requestReportFor(stateRef.current.session), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const endSession = useCallback(() => {
+    stopCurrentAudio();
+    clearPendingSpeech();
+    recordingReset?.();
+    dispatch(goHome());
+  }, [clearPendingSpeech, dispatch, recordingReset, stopCurrentAudio]);
 
   const downloadTranscript = useCallback(() => {
-    if (!session) return;
-    downloadTextFile(`examiner-victoria-transcript-${safeDateStamp()}.txt`, buildTranscriptText(session));
-  }, [session]);
+    const session = stateRef.current.session;
+    if (session) downloadTextFile(`examiner-victoria-transcript-${safeDateStamp()}.txt`, buildTranscriptText(session));
+  }, []);
 
-  const downloadPracticeRecord = useCallback(() => {
-    if (!session) return;
-    downloadTextFile(
-      `examiner-victoria-practice-record-${safeDateStamp()}.txt`,
-      buildPracticeRecordText(session, report),
-    );
-  }, [report, session]);
+  const downloadRecord = useCallback(() => {
+    const { session, report } = stateRef.current;
+    if (session) {
+      downloadTextFile(`examiner-victoria-practice-record-${safeDateStamp()}.txt`, buildPracticeRecordText(session, report));
+    }
+  }, []);
 
   return {
-    changeFeedbackAdaptation,
-    changeCueCardTitle,
-    changePart1Topic,
-    changePracticeType,
-    changeTrainingMode,
-    createFreshSession,
-    downloadPracticeRecord,
-    downloadReport,
+    cancelRetake,
+    discardPending,
+    downloadRecord,
     downloadTranscript,
-    handleTextComposerKeyDown,
+    endSession,
+    finishRetake,
+    goNext,
+    listen,
     loadBackendStatus,
+    replayQuestion,
     requestReport,
-    restoreSavedSession,
-    setBusy,
-    setClockTick,
-    setDraft,
-    setError,
-    setMode,
-    setPrepEndsAt,
-    setReviewBeforeSend,
+    retryPending,
+    startCall,
+    startRetake,
     submitAnswer,
-    submitTypedAnswer,
-    toggleAudioEnabled,
-    toggleInputMode,
   };
 }

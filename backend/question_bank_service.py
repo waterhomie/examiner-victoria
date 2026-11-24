@@ -97,10 +97,17 @@ def get_question_bank_summary() -> dict[str, int]:
     }
 
 
-def get_practice_options() -> dict[str, list]:
+# V4: display-only label for the home screen bank card. It describes the real
+# source of the bank (candidate recall, May-August booklet). It is NOT an
+# official IELTS label and carries no "new"/"retained" tagging.
+QUESTION_BANK_LABEL = "May\u2013Aug candidate recall"
+
+
+def get_practice_options() -> dict:
     return {
         "part1_topics": [topic["name"] for topic in PART1_SECONDARY_TOPICS],
         "cue_cards": [{"title": card["title"]} for card in ALL_CUE_CARDS],
+        "question_bank_label": QUESTION_BANK_LABEL,
     }
 
 
