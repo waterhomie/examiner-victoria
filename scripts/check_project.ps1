@@ -23,11 +23,18 @@ if (-not $SkipInstall) {
 
 $requiredStructureFiles = @(
     ".\frontend\src\App.jsx",
-    ".\frontend\src\components\layout\AnswerComposer.jsx",
-    ".\frontend\src\components\layout\ChatPanel.jsx",
-    ".\frontend\src\components\layout\ExamHeader.jsx",
-    ".\frontend\src\components\layout\ExamStageCard.jsx",
-    ".\frontend\src\components\messages\MessageViews.jsx",
+    ".\frontend\src\components\ui.jsx",
+    ".\frontend\src\components\ErrorCard.jsx",
+    ".\frontend\src\components\Sheets.jsx",
+    ".\frontend\src\components\SystemCheck.jsx",
+    ".\frontend\src\components\TranscriptSheet.jsx",
+    ".\frontend\src\components\screens\HomeScreen.jsx",
+    ".\frontend\src\components\screens\CallScreen.jsx",
+    ".\frontend\src\components\screens\ExamScreen.jsx",
+    ".\frontend\src\components\screens\MarkingScreen.jsx",
+    ".\frontend\src\components\screens\ReviewScreen.jsx",
+    ".\frontend\src\components\screens\RetakeScreen.jsx",
+    ".\frontend\src\components\screens\RecapScreen.jsx",
     ".\frontend\src\hooks\useAnswerRecording.js",
     ".\frontend\src\hooks\useBrowserEffects.js",
     ".\frontend\src\hooks\useExamController.js",
@@ -35,16 +42,12 @@ $requiredStructureFiles = @(
     ".\frontend\src\state\actions.js",
     ".\frontend\src\state\appReducer.js",
     ".\frontend\src\state\initialState.js",
-    ".\frontend\src\state\selectors.js",
     ".\frontend\src\utils\sessionView.js",
-    ".\frontend\src\styles.css",
-    ".\frontend\src\styles\base.css",
-    ".\frontend\src\styles\header.css",
-    ".\frontend\src\styles\stage.css",
-    ".\frontend\src\styles\chat.css",
-    ".\frontend\src\styles\report.css",
-    ".\frontend\src\styles\composer.css",
-    ".\frontend\src\styles\mobile.css",
+    ".\frontend\src\utils\feedbackView.js",
+    ".\frontend\src\utils\reportView.js",
+    ".\frontend\src\styles\tokens.css",
+    ".\frontend\src\styles\app.css",
+    ".\backend\answer_feedback_service.py",
     ".\backend\app.py",
     ".\backend\core\config.py",
     ".\backend\core\payload_limits.py",
@@ -175,71 +178,37 @@ if ($engineLineCount -gt 180) {
 }
 
 $mainJsx = Get-Content -LiteralPath ".\frontend\src\main.jsx" -Raw
-$stylesImportIndex = $mainJsx.IndexOf('import "./styles.css";')
-$mobileStylesImportIndex = $mainJsx.IndexOf('import "./styles/mobile.css";')
-if ($stylesImportIndex -lt 0 -or $mobileStylesImportIndex -lt 0 -or $stylesImportIndex -gt $mobileStylesImportIndex) {
-    throw "Frontend style imports must load styles.css before styles/mobile.css."
+$tokensImportIndex = $mainJsx.IndexOf('import "./styles/tokens.css";')
+$appStylesImportIndex = $mainJsx.IndexOf('import "./styles/app.css";')
+if ($tokensImportIndex -lt 0 -or $appStylesImportIndex -lt 0 -or $tokensImportIndex -gt $appStylesImportIndex) {
+    throw "Frontend style imports must load styles/tokens.css before styles/app.css."
 }
 
-$desktopStyles = Get-Content -LiteralPath ".\frontend\src\styles.css" -Raw
-$mobileStyles = Get-Content -LiteralPath ".\frontend\src\styles\mobile.css" -Raw
-$requiredStyleImports = @(
-    '@import "./styles/base.css";',
-    '@import "./styles/header.css";',
-    '@import "./styles/stage.css";',
-    '@import "./styles/chat.css";',
-    '@import "./styles/report.css";',
-    '@import "./styles/composer.css";'
+$legacyFrontendPaths = @(
+    ".\frontend\src\styles.css",
+    ".\frontend\src\styles\mobile.css",
+    ".\frontend\src\components\layout",
+    ".\frontend\src\components\messages",
+    ".\frontend\src\state\selectors.js"
 )
-foreach ($styleImport in $requiredStyleImports) {
-    if (-not $desktopStyles.Contains($styleImport)) {
-        throw "styles.css must remain a shared CSS entrypoint and import: $styleImport"
+foreach ($legacyFrontendPath in $legacyFrontendPaths) {
+    if (Test-Path -LiteralPath $legacyFrontendPath) {
+        throw "Legacy V3 chat-layout path must not return in V4: $legacyFrontendPath"
     }
 }
-$nonMobileStyleFiles = Get-ChildItem -LiteralPath ".\frontend\src\styles" -Filter "*.css" -File |
-    Where-Object { $_.Name -ne "mobile.css" }
-foreach ($styleFile in $nonMobileStyleFiles) {
-    $styleText = Get-Content -LiteralPath $styleFile.FullName -Raw
-    if ($styleText -match "@media\s*\(max-width:\s*620px\)") {
-        throw "Phone breakpoint rules should live in frontend/src/styles/mobile.css, not $($styleFile.Name)."
+
+$appStyles = Get-Content -LiteralPath ".\frontend\src\styles\app.css" -Raw
+if ($appStyles -notmatch "var\(--ev-safe-bottom\)") {
+    throw "styles/app.css must keep the bottom safe-area inset (--ev-safe-bottom) for the fixed mic dock."
+}
+if ($appStyles -notmatch "prefers-reduced-motion") {
+    throw "styles/app.css must honour prefers-reduced-motion."
+}
+$tokenStyles = Get-Content -LiteralPath ".\frontend\src\styles\tokens.css" -Raw
+foreach ($token in @("--ev-ink:", "--ev-paper:", "--ev-ember-1:", "--ev-ember-2:", "--ev-rose:", "--ev-mint:", "--ev-amber:", "--ev-indigo:", "--ev-safe-bottom:")) {
+    if (-not $tokenStyles.Contains($token)) {
+        throw "styles/tokens.css is missing design token: $token"
     }
-}
-if ($mobileStyles -notmatch "@media\s*\(max-width:\s*620px\)") {
-    throw "styles/mobile.css should contain the phone breakpoint rules."
-}
-if ($mobileStyles -match "\.(assistant-row|user-row|assistant-bubble|user-bubble)\b") {
-    throw "styles/mobile.css references old message selectors. Use .message-row.assistant/.message-row.user and their .bubble children."
-}
-if ($mobileStyles -notmatch "\.message-row\.assistant" -or $mobileStyles -notmatch "\.message-row\.user") {
-    throw "styles/mobile.css must target the real mobile message row selectors."
-}
-if ($mobileStyles -notmatch "-webkit-overflow-scrolling:\s*touch" -or $mobileStyles -notmatch "touch-action:\s*pan-y") {
-    throw "styles/mobile.css must keep iOS chat-panel touch scrolling enabled."
-}
-if ($mobileStyles -match "\.chat-panel\s*>\s*\.message-row:first-child\s*\{[\s\S]*?margin-top:\s*auto") {
-    throw "styles/mobile.css must not force short mobile chats to the bottom with first-child margin-top:auto."
-}
-if ($mobileStyles -notmatch "padding-top:\s*clamp\(16px,\s*3vh,\s*32px\)") {
-    throw "styles/mobile.css must give the mobile chat-panel a small top breathing space."
-}
-if ($mobileStyles -notmatch "\.chat-bottom-anchor\s*\{[\s\S]*?flex-basis:\s*calc\(124px \+ env\(safe-area-inset-bottom\)\)") {
-    throw "styles/mobile.css must define a mobile .chat-bottom-anchor sized above the fixed composer."
-}
-
-$chatPanelSource = Get-Content -LiteralPath ".\frontend\src\components\layout\ChatPanel.jsx" -Raw
-if ($chatPanelSource -notmatch 'className="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'data-testid="chat-bottom-anchor"' -or $chatPanelSource -notmatch 'ref=\{bottomRef\}') {
-    throw "ChatPanel must render a real chat-bottom-anchor bound to bottomRef."
-}
-if ($chatPanelSource -notmatch 'className="chat-scroll-slack"' -or $chatPanelSource -notmatch 'data-testid="chat-scroll-slack"') {
-    throw "ChatPanel must render chat-scroll-slack so short mobile chats can keep limited native bounce without moving the first message."
-}
-
-$browserEffectsSource = Get-Content -LiteralPath ".\frontend\src\hooks\useBrowserEffects.js" -Raw
-if ($browserEffectsSource -notmatch "answerCount\s*===\s*0" -or $browserEffectsSource -notmatch "contentBottomBeforeAnchor" -or $browserEffectsSource -notmatch "visibleSafeHeight" -or $browserEffectsSource -notmatch "shouldFollowBottom") {
-    throw "useAutoScrollToLatest must keep initial messages in natural flow and follow bottom only after real content reaches the composer safe area."
-}
-if ($browserEffectsSource -notmatch "SHORT_SCROLL_SLACK_PX\s*=\s*48" -or $browserEffectsSource -notmatch "updateShortScrollSlack" -or $browserEffectsSource -notmatch "shortScrollSlackHeight") {
-    throw "useAutoScrollToLatest must maintain a small dynamic short-scroll slack for limited mobile bounce."
 }
 
 $frontendSourceFiles = Get-ChildItem -LiteralPath ".\frontend\src" -Recurse -File |
@@ -271,6 +240,9 @@ Invoke-ProjectNative $python -m py_compile `
     .\backend\question_bank_service.py `
     .\backend\report_service.py `
     .\backend\schemas.py `
+    .\backend\answer_feedback_service.py `
+    .\backend\answer_feedback_test.py `
+    .\backend\part1_feedback_service.py `
     .\backend\engine.py `
     .\backend\routes\answer.py `
     .\backend\routes\audio.py `
@@ -323,6 +295,7 @@ foreach ($scriptFile in $scriptFiles) {
 }
 
 Invoke-ProjectNative $python .\validate_question_bank.py
+Invoke-ProjectNative $python -m backend.answer_feedback_test
 Invoke-ProjectNative $python -m backend.smoke_test
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\check_deploy_config.ps1
 
@@ -349,17 +322,20 @@ if (-not $distJsFiles) {
 }
 $distJsText = ($distJsFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }) -join "`n"
 $requiredTestIds = @(
-    "exam-header",
-    "training-mode-select",
-    "practice-type-select",
-    "answer-composer",
-    "composer-mode-toggle",
-    "record-button",
-    "chat-panel",
-    "chat-bottom-anchor",
-    "chat-scroll-slack",
-    "message-user",
-    "message-assistant"
+    "home-screen",
+    "start-button",
+    "call-screen",
+    "call-button",
+    "exam-screen",
+    "question-text",
+    "mic-button",
+    "marking-screen",
+    "review-screen",
+    "top-fix",
+    "retake-screen",
+    "recap-screen",
+    "type-input",
+    "voice-banner"
 )
 foreach ($testId in $requiredTestIds) {
     if (-not $distJsText.Contains($testId)) {

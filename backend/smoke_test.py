@@ -29,6 +29,7 @@ from backend.app import app
 from backend.engine import build_fallback_report, build_session_learning_summary
 from backend.schemas import ExamSession
 from backend.adaptive_feedback_test import run_adaptive_checks
+from backend.answer_feedback_test import run_answer_feedback_checks
 
 
 DETERMINISTIC_REPORT = """# IELTS Speaking Report
@@ -893,6 +894,7 @@ def assert_mock_mode_starts_cleanly(client: TestClient) -> None:
 
 
 def main() -> None:
+    run_answer_feedback_checks()
     run_adaptive_checks()
     assert config.ROOT_DIR == Path(__file__).resolve().parents[1], config.ROOT_DIR
     assert config.DEFAULT_FRONTEND_DIST == config.ROOT_DIR / "frontend" / "dist"

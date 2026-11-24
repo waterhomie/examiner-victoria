@@ -1,45 +1,206 @@
-# Examiner Victoria｜V4 交接说明
+# Examiner Victoria V4 · Coach UI — Handoff
 
-> 状态：**V4 尚未开始**。本文只整理 V3 基线、二面反馈和下一阶段的决策依据；不是 V4 方案定稿，也不代表功能已实现或通过用户验证。
+Branch: `v4/coach-ui` (based on `main` @ `5af1cee`). **Nothing is committed
+yet**: all changes are in the working tree so the next owner (Codex) can
+review the diff, then commit and open a PR to `main` when the owner
+authorises it. Nothing has been deployed; CloudBase/Railway settings were
+not touched.
 
-## 1. 从哪里接手
+## 1. What V4 is
 
-- 以当前 `main` 的 V3 Beta 为基线；本说明基于 [PR #58](https://github.com/waterhomie/examiner-victoria/pull/58) 合并后的代码。新工作应从最新 `main` 开短分支、经 PR 审查，不在旧的 V3 修补分支上继续堆改动。
-- 活跃代码仍在 `frontend/`、`backend/`、`scripts/`；不要另建 `v4/` 运行目录。架构、部署与能力边界见 [V3 当前状态](V3_CURRENT_STATUS.md)。该状态文档的更新时间较早，涉及最新 UI 时应以当前代码和实机观察为准。
-- V3 已有 Practice / Mock、Part 1–3 / Full、手机 H5、录音转写、反馈与报告等能力。近期合并了首次使用引导、移动端布局和非 Full 练习中的重复标签修正。**这些是交互实现，不等于独立新用户上手成功、反馈质量或跨设备语音稳定性已经得到证明。**
-- 本次交接不修改产品代码、Prompt、题库、评分、服务商、部署或数据结构。
+The V3 chat-stream UI is replaced by a screen-based coach flow following
+the V2.2 design concept (English UI, ink/paper surfaces, ember mic):
 
-## 2. 二面带来的核心判断
+```text
+Home → Call → Question (exam) → Marking → Review → [Retake → Review] → next Question … → Recap
+```
 
-面试方认可“引导比完全没有引导好”，也注意到移动端问题在交付前被发现并修正；但主要质疑是更上游的设计判断：为什么选择逐步文字引导？有没有比较过优秀产品的同类交互？为什么首屏仍有较多按钮和说明？真实用户可能只有很短的耐心，不能假设他愿意读完教程、反复探索。
+- **Practice**: each answer shows a review: verdict chips, a **Top fix**
+  card, a marked transcript (deletions in rose, insertions in mint with a
+  "+", fillers in italic), a natural version, a "Listen" option, and one retake
+  of the same question with a before/after comparison (length, hesitations,
+  fix #1).
+- **Mock**: there is no coaching between questions, and answers go straight to
+  the next question. The recap/report is shown at the end.
+- **Part 2**: a cue card with a 60 s prep countdown, a 60 s minimum and a 120 s
+  maximum, and an auto-stop. The backend's "Please continue" nudge is shown from
+  `spoken_text` (`state.nextSpeech`).
+- **Errors**: there are cards for mic denied (with WeChat/iOS hints), a silent
+  recording and offline (the pending answer is kept and retried
+  automatically when the connection returns). There is a non-blocking banner
+  when TTS fails (the question is still shown as text).
+- **Desktop ≥1024px**: a split view, with the exam on the left and the review
+  on the right. Hold Space to talk.
+- **Home memo**: "From last time" stores one fix in localStorage after a
+  report.
 
-因此，V4 的问题不是“把 V3 的引导文案再缩短一点”，而是：**一个首次进入的手机用户，能否在几秒内明白下一步并完成第一道题，同时保留必要的 Practice / Mock 区别和失败恢复能力？** 允许在证据支持下重做入口与信息层级，而不是预设继续修补现有布局；也不预设必须推倒全部 V3 功能。
+## 2. What was kept (mature V3 mechanisms)
 
-## 3. 证据与未解决问题
+These are unchanged or changed only minimally:
 
-| 主题 | 目前知道什么 | 仍不知道什么 |
-|---|---|---|
-| 首次上手 | 11 月 4 日有人在主持人帮助下体验旧界面与引导预览，暴露了“该读还是该答”、Restart 和标签理解问题；改动已经进入 V3。见[用户反馈记录](USER_FEEDBACK_LOG.md)。 | 无提示、无主持人的新用户能否独立完成首题；现有引导与更轻量入口谁更有效。 |
-| 11 月 6 日新用户 | 一位同学在手机夸克浏览器用文字作答，过程中未主动提出操作疑问，并提出练习报告应更易读、保存或分享的建议。匿名摘要见[用户反馈记录](USER_FEEDBACK_LOG.md)。 | 没有完整逐步操作记录，也没有前后版本对照；不能据此宣称引导已验证有效。原始聊天与截图不进入此 PR。 |
-| 语音可靠性 | 该同学的截图出现语音播放暂不可用、转写连接失败；文字作答可继续。此前 iPhone 路径可用。 | 设备、系统版本、网络、权限和请求日志不全；不能把原因归于夸克、Android、网络或麦克风权限中的任一个。 |
-| 反馈与报告 | V3 有逐题反馈、最终报告和导出。用户提出更直观的图片/PDF 报告；面试中也质疑反馈能否适配英语水平。 | 报告形式偏好、反馈准确性、能力分层和代表性样本量尚未验证。界面更易理解不等于模型反馈更准。 |
+- `recorder.js` (MediaRecorder + WAV fallback) and `audioSilence.js`.
+- The browser STT fast path with server Whisper fallback. Only an `onUpdate`
+  hook for live captions was added.
+- TTS playback/cache and the iOS tap-to-play fallback. `prefetchSpeech` was
+  added for the next question.
+- The `api.js` request layer, session storage/resume, runtime diagnostics,
+  telemetry, downloads, the System check and pagehide cleanup.
+- Backend: the Prompt, question bank, scoring, report generation,
+  Practice/Mock rules, phase flow, providers, rate limiting, payload limits
+  and the Docker/CloudBase contract are **all unchanged**.
 
-## 4. V4 首轮工作顺序（先决策，再实现）
+## 3. What was removed
 
-1. **定义任务与基线。** 固定当前 V3 的手机首用流程，记录首屏、第一动作、完成首题、查看反馈和一次失败后的继续路径；注明设备、浏览器、版本与是否有人提示。不要把既有截图当作完整行为证据。
-2. **做交互参照研究。** 选同类口语练习产品，以及不同领域但同样需要“几秒上手”的优秀 C 端产品。比较首屏主动作、按钮数量与层级、是否先体验再解释、模式选择时机、出错恢复；记录可借鉴点与不适合本产品的原因。
-3. **提出至少两种可比较的入口方案。** 例如“直接进入一题，按需解释模式”与“极简模式选择后立即开始”。用手机宽度原型展示完整首题路径，不只画静态首屏；明确哪些功能被后置、在哪里找回。
-4. **找全新用户做同任务对照。** 先观察、不代操作；至少记录首次点击、是否求助、首题完成、反馈是否被理解，以及一次错误后能否继续。样本少时只报告观察，不给显著性或普遍性结论。
-5. **选择最小改动范围并实施。** 以完成任务和理解程度选择方案，再拆成小 PR；不要为了“V4”同时重写语音、反馈模型、报告和部署。
+The following were removed with `git rm` and are listed in `git status`:
 
-首轮验收重点是：用户知道第一步、能完成一题、知道如何继续；Practice 与 Mock 不被误解；关键失败有明确下一步。指标定义和通过线应在测试前确定，并保留失败案例，不从一次顺利体验倒推方案成功。
+- `frontend/src/components/layout/*`, `components/messages/*`
+- The old `styles.css` and `styles/*.css` (base, header, stage, chat,
+  report, composer, mobile, diagnostics)
+- `state/selectors.js`, `utils/feedbackPlayback.js`
+- The guided tour, mobile toasts, the pending-speech card and the stage
+  summary
+- Tests for those: `adaptive_render_test.js`, `feedback_playback_test.js`,
+  the frontend `adaptive_feedback_test.js`, and the `guide_*`/`mobile_recording_*`
+  fixtures and tests
 
-## 5. 并行问题，不混作首屏改版成果
+## 4. Backend changes (all additive)
 
-- **语音与跨设备：** 单列兼容性排查。复现时记录浏览器、系统、设备、网络、权限状态、失败环节（录音 / 上传 / 转写 / 提交 / 播放）及可匿名化的请求结果；保留文字输入和重试路径。未定位前不许宣称已修复。
-- **反馈质量：** 复用[最小质量测试集](evaluation/V3_MINIMAL_QUALITY_TEST_SET.md)做不同水平、偏题、无效回答和多轮样本；邀请人工评审准确性、原意保留、建议可执行性与稳定性。现有产品不做声学发音评分，不能把文字转写当成发音能力证据。
-- **报告呈现：** 先核实用户要解决的是手机阅读、保存还是分享；对比改良网页报告、图片与 PDF，保留可复制文本和原始回答的可追溯性。此建议尚未开发。
+| File | Change |
+| --- | --- |
+| `answer_feedback_service.py` (new) | Deterministic structured feedback with no model call. It builds a difflib word diff between the answer and the natural version, detects hesitations (um/uh/er/erm/hmm/ah/eh plus immediate repeats, except very/really/so) and gives a pace label (<90 slow, >180 fast wpm, audio only). |
+| `part1_feedback_service.py` | `Part1Feedback.kind` exposes which feedback branch was used. |
+| `engine.py` | `process_answer_detailed()` returns a `ProcessedAnswer`. `process_answer()` is kept as a wrapper returning the same 4-tuple as before. |
+| `routes/answer.py` | Adds `feedback`, `answered_question` and `answered_phase` to the response. |
+| `schemas.py` | `AnswerCorrection`, `AnswerEdit`, `AnswerHesitation`, `AnswerFeedback`, plus the new optional `AnswerResponse` fields. |
+| `ai_provider.py` | Caches one OpenAI client (behind a lock). An optional timeout is applied from `LLM_TIMEOUT_SECONDS`. |
+| `core/config.py` | `LLM_TIMEOUT_SECONDS` (default `0` = SDK default, i.e. unchanged behavior) and `TRUST_PROXY_HEADERS` (default `false`). |
+| `core/rate_limit.py`, `routes/audio.py` | `client_key(request)` uses X-Forwarded-For/X-Real-IP only when `TRUST_PROXY_HEADERS=true`. |
+| `question_bank_service.py`, `routes/health.py` | `QUESTION_BANK_LABEL = "May–Aug candidate recall"` is exposed in practice options. |
 
-## 6. 交接边界
+### `/api/answer` response — new fields
 
-V4 的第一项交付物应是**有证据的设计选择与手机端任务流程**，不是预先承诺的新界面。招聘结果和面试评价不是产品验证数据；二面建议作为设计输入，而非已证实的唯一正确方案。私密访谈原文、用户聊天截图与未审查的内部制作文件继续留在仓库外；公开文档只保留匿名结论和可核对的实现链接。
+```jsonc
+{
+  "session": { ... },              // unchanged
+  "assistant_message": { ... },    // unchanged, still canonical text
+  "spoken_text": "...",            // unchanged
+  "answered_question": "Do you work or are you a student?",
+  "answered_phase": "part1",
+  "feedback": {
+    "mode": "practice",            // "practice" | "mock"
+    "coaching": true,              // false for mock and identity phase
+    "available": true,             // a correction or tip was produced
+    "kind": "correction",          // Part1Feedback.kind, null if unknown
+    "correction": { "sentence": "...", "quote": "I am work",
+                    "replacement": "I work", "quote_in_answer": true },
+    "tip": "...",
+    "natural_version": "...",
+    "edits": [ { "op": "equal|delete|insert|replace", "text": "...", "replacement": null } ],
+    "hesitations": [ { "kind": "filler|repeat", "text": "um", "word_index": 3 } ],
+    "hesitation_count": 2,
+    "word_count": 41,
+    "duration": 18.2,
+    "words_per_minute": 135.0,
+    "pace": "good"                 // "slow" | "good" | "fast" | null (typed)
+  }
+}
+```
+
+When `coaching=false`, the coaching fields are empty. Old clients ignore the
+new fields.
+
+## 5. Frontend map
+
+See `frontend/ARCHITECTURE.md`. The short version:
+
+- `state/appReducer.js` handles all screen transitions.
+- `hooks/useExamController.js` handles all async actions.
+- `components/screens/*` holds one file per screen.
+- `utils/feedbackView.js`, `utils/reportView.js` and `utils/sessionView.js`
+  hold the pure view logic, which is unit-tested in `frontend/smoke_test.js`.
+- `styles/tokens.css` holds the V2.2 tokens; `styles/app.css` holds the layout.
+
+## 6. How to run locally
+
+With real providers (unchanged from V3):
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\scripts\run_local_stack.ps1 -BackendPort 8010 -FrontendPort 5174 -SkipInstall
+```
+
+For UI work without keys, use the fake backend. It patches the LLM, TTS and
+STT locally and is never for deployment:
+
+```bash
+python scripts/run_fake_backend.py   # :8010, serves frontend/dist too
+cd frontend && pnpm dev              # or pnpm build and open :8010
+```
+
+The fake LLM returns fixed corrections such as "I very like" → "I really
+like", "I am work" → "I work" and "people is" → "people are". Typing those
+phrases is the easiest way to see the review screen's marks.
+
+## 7. Test status (at handoff)
+
+| Check | Result |
+| --- | --- |
+| `python -m backend.answer_feedback_test` | 9 tests OK |
+| `python -m backend.smoke_test` | **1 pre-existing failure:** `adaptive_feedback_test.test_refresh_toggle_repeated_answer_and_system_copy`. It reproduces on the untouched `main` @ `5af1cee` (verified via `git archive HEAD`), so it is not caused by V4. It aborts `smoke_test.main()` before the FastAPI checks. With that adaptive block skipped, all FastAPI smoke checks plus the new V4 answer-feedback checks pass. |
+| `pnpm run test:smoke` (frontend) | pass |
+| `pnpm run build` | pass |
+| End-to-end Playwright flow against the fake backend | pass. It covered home → call → exam → recording → marking → review → retake → recap, typed answer, Part 2 prep/speak/review, settings, offline card plus auto-retry, mic denied (WeChat UA), silent recording, desktop split and the home memo. |
+| `scripts/check_project.ps1` | **Updated for V4 but not executed** (no PowerShell in the Linux build environment). Please run it on Windows first. |
+
+## 8. Decisions for the owner / next steps for Codex
+
+1. **Fix or re-baseline** the pre-existing adaptive test failure (section 7)
+   so that `smoke_test.py` runs end to end.
+2. **TTS rate limit.** V4 prefetches the next question, so a fast session can
+   reach `TTS_RATE_LIMIT_PER_MINUTE=3` per session. Two 429s appeared in the
+   scripted fast flow. These are handled gracefully (voice banner, text
+   stays). Recommendation: raise it to about 8. This needs owner approval
+   because it is a cost/config change.
+3. **`TRUST_PROXY_HEADERS`.** Enable it on CloudBase only after confirming
+   that the gateway overwrites X-Forwarded-For. The default stays `false`.
+4. **`LLM_TIMEOUT_SECONDS`.** The default `0` keeps the SDK behavior. Consider
+   20–30 s so that the marking screen fails fast instead of hanging.
+5. **Marking latency.** `/api/answer` is still one blocking call. A streaming
+   or split endpoint (transcript first, feedback second) would make the
+   marking screen honest. This is not done because it changes the API flow.
+6. **Band estimate display.** The recap shows the report's band if it is
+   present. Decide whether Practice should show a band at all.
+7. **Backend copy.** Some backend strings still say "Tap **Score**…" (V3 UI
+   wording). They are stripped/ignored by the V4 UI. Changing them touches
+   Prompt/flow copy, so it needs authorisation.
+8. **Pronunciation** is shown as "Can't be judged from text." There is still
+   no acoustic scoring (by design).
+9. **STT-suspect marks** (amber "not heard") are styled, but the backend does
+   not yet return word confidence.
+10. **Season / "new" tags** for topics need data from the question bank. Only
+    the `QUESTION_BANK_LABEL` is exposed for now.
+11. **Visual placeholders.** The Victoria avatar is a monogram gradient and the
+    waveform is decorative only (it is not driven by audio levels).
+12. **TTS text** is cut at 280 characters on a sentence end (`fitForSpeech`)
+    to stay under `TTS_MAX_TEXT_CHARS=300`.
+13. **`render.yaml`** is kept untouched (it is referenced by
+    `check_deploy_config.ps1`, `prepare_public_deploy_bundle.ps1` and
+    `docs/DEPLOYMENT.md`). Remove it in a separate deploy-tooling task if it
+    is no longer needed.
+14. There is no lint configuration in `frontend/`. Consider adding ESLint
+    before more contributors join.
+
+## 9. Suggested commit / PR
+
+```text
+feat(v4): coach UI with structured answer feedback
+
+- frontend: screen-based coach flow (call/exam/marking/review/retake/recap),
+  V2.2 tokens, error cards, desktop split, hold-to-talk
+- backend: additive `feedback` object on /api/answer (deterministic),
+  cached LLM client, optional LLM timeout, opt-in proxy-aware rate-limit key
+- remove V3 chat-layout components, styles and their tests
+- scripts: V4 check_project rules, local fake backend for UI work
+```
+
+Open the PR against `main`. Merge only after review and explicit
+authorisation (see `AGENTS.md`).

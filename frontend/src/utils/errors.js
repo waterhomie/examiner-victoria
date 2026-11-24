@@ -1,73 +1,95 @@
-export const VOICE_UNAVAILABLE_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above.";
-export const INVALID_ANSWER_MESSAGE = "No clear answer was detected. Please answer in words or try recording again.";
+// Error classification and copy. V4 copy: short B1 English, one action each.
+// The matching rules are unchanged from V3; only the wording changed.
+
+export const VOICE_UNAVAILABLE_MESSAGE = "Victoria can't speak right now. The question is shown as text.";
+export const INVALID_ANSWER_MESSAGE = "We couldn't find any words. Try again, or type your answer.";
+
+// Error kinds map to the four V2.2 error cards (plus a generic one).
+export const ERROR_KINDS = {
+  MIC: "mic",
+  SILENT: "silent",
+  VOICE: "voice",
+  OFFLINE: "offline",
+  GENERIC: "generic",
+};
+
+export function isNetworkError(error) {
+  const message = String(error?.message || error || "");
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  return /not reachable|network|failed to fetch|load failed|timed out|waking up/i.test(message);
+}
 
 export function transcriptionRecovery(error) {
   const message = String(error?.message || "");
   const status = error?.status;
   if (/clearly silent recording/i.test(message)) {
-    return { message: "No sound was detected. Tap Voice to record again, or type your answer below.", retryAudio: false };
+    return { kind: ERROR_KINDS.SILENT, message: "We couldn't hear anything.", retryAudio: false };
   }
   if (/recording is too short|too short/i.test(message)) {
-    return { message: "The recording was too short to detect an answer. Tap Voice to record again, or type your answer below.", retryAudio: false };
+    return { kind: ERROR_KINDS.SILENT, message: "That was too short to hear.", retryAudio: false };
   }
   if (/no clear speech was detected/i.test(message)) {
-    return { message: "No clear English answer was detected. If you spoke, please try answering in English again, or type your answer below.", retryAudio: false };
+    return { kind: ERROR_KINDS.SILENT, message: "We couldn't hear clear English.", retryAudio: false };
   }
   if (status === 413 || /too large|too long/i.test(message)) {
-    return { message: "This recording is too long. Record a shorter answer, or type it below.", retryAudio: false };
+    return { kind: ERROR_KINDS.GENERIC, message: "This recording is too long. Please keep it shorter.", retryAudio: false };
   }
   if (status === 429 || /too many requests/i.test(message)) {
-    return { message: "Too many requests. Please wait a moment, then try again.", retryAudio: false };
+    return { kind: ERROR_KINDS.GENERIC, message: "Too many tries. Please wait a moment.", retryAudio: false };
   }
   if (/microphone|permission|notallowed|denied|secure HTTPS|secure context|local network HTTP/i.test(message)) {
-    return { message: friendlyError(error, "Microphone access is unavailable."), retryAudio: false };
+    return { kind: ERROR_KINDS.MIC, message: friendlyError(error, "Microphone access needed."), retryAudio: false };
   }
   if (status >= 500 || /transcription|not reachable|timed out|network|failed to fetch|load failed|waking up/i.test(message)) {
-    return { message: "Audio transcription could not connect. Retry this audio, record again, or type your answer below.", retryAudio: true };
+    return {
+      kind: isNetworkError(error) ? ERROR_KINDS.OFFLINE : ERROR_KINDS.GENERIC,
+      message: "We couldn't send your recording. Your audio is still here.",
+      retryAudio: true,
+    };
   }
-  return { message: friendlyError(error, "Recording could not be sent."), retryAudio: false };
+  return { kind: ERROR_KINDS.GENERIC, message: friendlyError(error, "Recording could not be sent."), retryAudio: false };
 }
 
 export function friendlyError(err, fallback) {
   const message = err?.message || "";
   if (/secure HTTPS|secure context|local network HTTP|isSecureContext/i.test(message)) {
-    return "iPhone Safari needs HTTPS before it can ask for microphone permission. This local Wi-Fi address can be used for text testing, but voice recording needs an HTTPS preview or public deployment.";
+    return "Voice needs a secure (HTTPS) page. You can still type.";
   }
   if (/microphone|permission|notallowed|denied/i.test(message)) {
-    return "Microphone access was blocked. Please allow microphone permission, or switch to Text.";
+    return "Microphone access needed.";
   }
   if (/recording is too short|too short/i.test(message)) {
-    return "That recording was too short. Type your answer below, or tap Voice to record again.";
+    return "That was too short to hear.";
   }
   if (/no clear speech was detected/i.test(message)) {
-    return "I couldn't make out your answer. Type it below, or tap Voice to record again.";
+    return "We couldn't hear clear English.";
   }
   if (/no clear answer|answer in words/i.test(message)) {
     return INVALID_ANSWER_MESSAGE;
   }
   if (/too many requests/i.test(message)) {
-    return "Too many requests. Please wait a moment before trying again.";
+    return "Too many tries. Please wait a moment.";
   }
   if (/too long|too large|session is too large|voice playback text/i.test(message)) {
     return message;
   }
   if (/transcription|audio|whisper|duration/i.test(message)) {
-    return "Audio transcription is temporarily unavailable. Type your answer below, or tap Voice to record again.";
+    return "We couldn't turn your audio into text. Try again, or type.";
   }
   if (/tts|voice playback|voice is temporarily unavailable|voice unavailable/i.test(message)) {
     return VOICE_UNAVAILABLE_MESSAGE;
   }
   if (/not reachable|VITE_API_BASE|backend service/i.test(message)) {
-    return "Victoria's server is not reachable. Please try again in a moment, or check whether the backend is running.";
+    return "We can't reach Victoria. Check your connection.";
   }
   if (/^5\d\d\b|bad gateway|service unavailable/i.test(message)) {
-    return "Victoria's voice or AI service is temporarily unavailable. You can continue with the visible text and try again in a moment.";
+    return "Victoria is busy right now. Please try again soon.";
   }
   if (/timed out|waking up/i.test(message)) {
-    return "Victoria's server is taking too long to respond. It may be waking up, so please try again in a moment.";
+    return "Victoria is taking too long. Please try again.";
   }
   if (/network|failed to fetch|load failed/i.test(message)) {
-    return "Network connection is unstable. Please try again in a moment.";
+    return "Your connection is unstable. Please try again.";
   }
   return message || fallback;
 }

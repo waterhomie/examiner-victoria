@@ -17,7 +17,7 @@ from ..audio_services import (
     get_tts_public_diagnostics,
     normalize_tts_provider_name,
 )
-from ..core.rate_limit import enforce_rate_limit
+from ..core.rate_limit import client_key, enforce_rate_limit
 from ..engine import synthesize_speech, transcribe_audio
 from ..schemas import TTSRequest, TranscriptionResponse
 
@@ -70,7 +70,7 @@ def _safe_tts_session_key(request_body: TTSRequest, request: Request) -> str:
     safe_session = "".join(ch for ch in str(raw_session) if ch.isalnum() or ch in {"-", "_", ":"})
     if safe_session:
         return safe_session[:80]
-    client_host = request.client.host if request.client else "unknown"
+    client_host = client_key(request)
     safe_host = "".join(ch for ch in str(client_host) if ch.isalnum() or ch in {"-", "_", ":", "."})
     return f"client:{safe_host[:80] or 'unknown'}"
 

@@ -1,334 +1,211 @@
+// V4 frontend smoke test: pure logic only (reducer, view helpers, API error
+// mapping). Run with `pnpm test:smoke`. No browser and no network needed.
 import assert from "node:assert/strict";
-import "./feedback_playback_test.js";
 import "./speech_playback_test.js";
-import "./adaptive_feedback_test.js";
-import "./adaptive_render_test.js";
 import "./audio_silence_test.js";
 import { readFileSync } from "node:fs";
 
 import { fetchRuntimeDiagnostics, healthCheck, sendAnswer, sendTelemetryEvent, synthesizeSpeech, TTS_TIMEOUT_MS } from "./src/api.js";
 import { browserSpeechTranscriptionIsSupported } from "./src/browserSpeechTranscriber.js";
-import { appReducer } from "./src/state/appReducer.js";
+import { STORAGE_KEY } from "./src/config/appConfig.js";
 import {
   answerFailed,
-  answerRequested,
+  answerSending,
   answerSucceeded,
-  errorSet,
-  practiceOptionsLoaded,
-  sessionStartRequested,
-  sessionStartSucceeded,
+  goHome,
+  markingStep,
+  nextQuestion,
+  patch,
+  restored,
+  retakeDone,
+  retakeStarted,
+  sessionStarted,
+  sessionStarting,
 } from "./src/state/actions.js";
-import { createInitialAppState } from "./src/state/initialState.js";
-import { selectCapabilities, selectMessages, selectSessionView } from "./src/state/selectors.js";
-import {
-  analyzeUserAgent,
-  buildDiagnosticCopyText,
-  checkLocalStorage,
-  getPageEnvironment,
-  getRecordingSupport,
-} from "./src/utils/runtimeDiagnostics.js";
-import { INVALID_ANSWER_MESSAGE, VOICE_UNAVAILABLE_MESSAGE, friendlyError, transcriptionRecovery } from "./src/utils/errors.js";
-import { getTourPosition } from "./src/components/layout/tourPosition.js";
-import { getTourSelectionKind, getTourTarget, nextTourStep, previousTourStep, TOUR_STAGES } from "./src/components/layout/tourSteps.js";
+import { appReducer } from "./src/state/appReducer.js";
+import { initialState, SCREENS } from "./src/state/initialState.js";
+import { ERROR_KINDS, friendlyError, INVALID_ANSWER_MESSAGE, transcriptionRecovery, VOICE_UNAVAILABLE_MESSAGE } from "./src/utils/errors.js";
+import { compareRetake, hasMarks, retakeHeadline, topFix, transcriptSegments, verdictChips } from "./src/utils/feedbackView.js";
+import { parseReport } from "./src/utils/reportView.js";
+import { analyzeUserAgent, buildDiagnosticCopyText } from "./src/utils/runtimeDiagnostics.js";
+import { displayQuestion, parseCueCard, progressFor, speakableText, stripMarkdown } from "./src/utils/sessionView.js";
 
 function setNavigator(value) {
-  Object.defineProperty(globalThis, "navigator", {
-    value,
-    configurable: true,
-  });
+  Object.defineProperty(globalThis, "navigator", { value, configurable: true });
 }
 
 function installWindow() {
-  globalThis.window = {
-    clearTimeout,
-    innerHeight: 667,
-    innerWidth: 375,
-    setTimeout,
-    SpeechRecognition: function SpeechRecognition() {},
-  };
+  globalThis.window = { clearTimeout, setTimeout, innerHeight: 667, innerWidth: 375, SpeechRecognition: function SpeechRecognition() {} };
 }
 
-function assertProductMetadata() {
-  const indexHtml = readFileSync("./index.html", "utf8");
-  const manifestSource = readFileSync("./public/manifest.webmanifest", "utf8");
-  const manifest = JSON.parse(manifestSource);
-  const packageMetadata = JSON.parse(readFileSync("./package.json", "utf8"));
-  const downloadsSource = readFileSync("./src/utils/downloads.js", "utf8");
-  const appConfigSource = readFileSync("./src/config/appConfig.js", "utf8");
-  const stageCardSource = readFileSync("./src/components/layout/ExamStageCard.jsx", "utf8");
-
-  assert.match(indexHtml, /<title>Examiner Victoria<\/title>/);
-  assert.doesNotMatch(indexHtml, /<title>Examiner Victoria V2<\/title>/);
-  assert.equal(manifest.name, "Examiner Victoria");
-  assert.equal(manifest.short_name, "Victoria");
-  assert.equal(packageMetadata.name, "examiner-victoria-frontend");
-  assert.match(downloadsSource, /Examiner Victoria - IELTS Speaking Transcript/);
-  assert.match(downloadsSource, /Examiner Victoria - Practice Record/);
-  assert.doesNotMatch(downloadsSource, /Examiner Victoria V2/);
-  assert.match(appConfigSource, /examiner-victoria-v2-state/);
-  assert.doesNotMatch(manifestSource, /Examiner Victoria V2|Examiner Victoria V3(?: Beta)?/);
-  assert.doesNotMatch(stageCardSource, /stage-pill|training-pill|Current practice summary/);
-}
-
-function assertContextualFeedbackPlaybackHint() {
-  const chatPanelSource = readFileSync("./src/components/layout/ChatPanel.jsx", "utf8");
-  const messageViewsSource = readFileSync("./src/components/messages/MessageViews.jsx", "utf8");
-  assert.match(chatPanelSource, /firstPlayableFeedbackIndex/);
-  assert.match(chatPanelSource, /splitFeedbackPlayback\(message\.content\)\.some\(\(section\) => section\.text\)/);
-  assert.match(chatPanelSource, /showPlaybackHint=\{index === firstPlayableFeedbackIndex\}/);
-  const tourSource = readFileSync("./src/components/layout/GuidedTour.jsx", "utf8");
-  const appSource = readFileSync("./src/App.jsx", "utf8");
-  const stageCardSource = readFileSync("./src/components/layout/ExamStageCard.jsx", "utf8");
-  const headerSource = readFileSync("./src/components/layout/ExamHeader.jsx", "utf8");
-  const headerCss = readFileSync("./src/styles/header.css", "utf8");
-  const chatCss = readFileSync("./src/styles/chat.css", "utf8");
-  assert.match(appSource, /<GuidedTour/);
-  assert.match(tourSource, /Choose a mode to see what it does/);
-  assert.match(tourSource, /When useful, Victoria points out a key correction/);
-  assert.match(tourSource, /Mock: follow the speaking test/);
-  assert.match(tourSource, /previousTourStep\(step, selectionKind\)/);
-  assert.match(tourSource, /This selector disappears after your first Part 1 answer/);
-  assert.match(stageCardSource, /data-tour-target="topic"/);
-  assert.match(stageCardSource, /data-tour-target="cue-card"/);
-  assert.match(appSource, /selectionKind=\{getTourSelectionKind\(sessionView\)\}/);
-  assert.match(appSource, /replayRequest=\{guideReplayRequest\}/);
-  assert.match(headerSource, /data-testid="replay-guide-button"/);
-  assert.match(headerSource, /Show guide/);
-  assert.match(headerCss, /\.mobile-more-menu \{\s*display: block;/);
-  assert.match(tourSource, /if \(replayRequest === 0\) return;/);
-  assert.match(tourSource, /setStep\(0\);/);
-  assert.match(tourSource, /More → Show guide/);
-  assert.match(tourSource, /Finish guide/);
-  assert.match(chatCss, /\.stage-card:has\(\.tour-target-active\) \{ position: relative; z-index: 101;/);
-  assert.match(tourSource, /<div className="tour-scrim" aria-hidden="true" \/>/);
-  assert.match(tourSource, /<div className="tour-popover" role="dialog"/);
-  assert.match(tourSource, /createPortal\(/);
-  assert.match(tourSource, /document\.body/);
-  assert.doesNotMatch(tourSource, /tour-layer/);
-  assert.doesNotMatch(chatPanelSource, /Quick guide/);
-  assert.match(messageViewsSource, /You may not need both every time/);
-  assert.doesNotMatch(chatPanelSource, /Tip: tap feedback text/);
-}
-
-function assertTourPositioning() {
-  const viewport = { width: 375, height: 667 };
-  const popover = { width: 300, height: 270 };
-  const flow = { left: 275, top: 60, bottom: 110 };
-  const below = getTourPosition(flow, popover, viewport);
-  assert.equal(below.top, 124);
-  assert.equal(below.left, 63);
-  assert.equal(below.maxHeight, 270);
-
-  const answer = { left: 20, top: 580, bottom: 650 };
-  const above = getTourPosition(answer, popover, viewport);
-  assert.ok(above.top + above.maxHeight <= answer.top - 14);
-
-  const compact = getTourPosition(flow, popover, { width: 375, height: 320 });
-  assert.ok(compact.top >= flow.bottom + 14);
-  assert.ok(compact.top + compact.maxHeight <= 320 - 12);
-  assert.ok(compact.maxHeight < popover.height);
-}
-
-function assertTourSelectionSteps() {
-  const flowInfo = TOUR_STAGES.indexOf("flow-info");
-  const selection = TOUR_STAGES.indexOf("selection");
-  const sound = TOUR_STAGES.indexOf("sound");
-  assert.equal(getTourTarget("selection", "topic"), "topic");
-  assert.equal(getTourTarget("selection", "cue-card"), "cue-card");
-  assert.equal(getTourSelectionKind({ shouldShowStageCard: true, showPart1TopicSelect: true }), "topic");
-  assert.equal(getTourSelectionKind({ shouldShowStageCard: true, showCueCardSelect: true }), "cue-card");
-  assert.equal(getTourSelectionKind({ shouldShowStageCard: false, showPart1TopicSelect: true }), null);
-  assert.equal(getTourSelectionKind({ shouldShowStageCard: true }), null);
-  assert.equal(nextTourStep(flowInfo, "topic"), selection);
-  assert.equal(nextTourStep(flowInfo, "cue-card"), selection);
-  assert.equal(nextTourStep(flowInfo, null), sound);
-  assert.equal(previousTourStep(sound, "topic"), selection);
-  assert.equal(previousTourStep(sound, null), flowInfo);
-}
-
-function createSession(overrides = {}) {
+function session(overrides = {}) {
   return {
-    messages: [],
+    session_id: "s-1",
+    phase: "part1",
+    practice_mode: true,
+    practice_type: "part1",
+    test_active: true,
+    current_question: "Do you like music?",
+    part1_queue: ["Do you like music?", "When do you listen?", "Who taught you?", "Do you sing?"],
+    part1_index: 1,
+    messages: [{ role: "assistant", content: "Do you like music?", phase: "part1" }],
     candidate_answers: [],
     answer_stats: [],
-    phase: "identity",
-    practice_type: "full",
-    test_active: true,
-    practice_mode: true,
-    voice_playback_enabled: true,
     ...overrides,
   };
 }
 
+const PRACTICE_FEEDBACK = {
+  mode: "practice",
+  coaching: true,
+  available: true,
+  kind: "relevant",
+  correction: { sentence: 'Say "I really like" instead of "I very like".', quote: "I very like", replacement: "I really like", quote_in_answer: true },
+  tip: null,
+  natural_version: null,
+  edits: [],
+  hesitations: [{ kind: "filler", text: "um", word_index: 0 }],
+  hesitation_count: 1,
+  word_count: 6,
+  duration: 4,
+  words_per_minute: 90,
+  pace: "good",
+};
+
+function assertProductMetadata() {
+  const indexHtml = readFileSync("./index.html", "utf8");
+  const manifest = JSON.parse(readFileSync("./public/manifest.webmanifest", "utf8"));
+  assert.match(indexHtml, /<title>Examiner Victoria<\/title>/);
+  assert.equal(manifest.name, "Examiner Victoria");
+  assert.equal(STORAGE_KEY, "examiner-victoria-v4-state");
+  // The V4 UI is English only; no Chinese UI copy except WeChat menu names.
+  const app = readFileSync("./src/App.jsx", "utf8");
+  assert.doesNotMatch(app, /[一-鿿]/);
+  const tokens = readFileSync("./src/styles/tokens.css", "utf8");
+  for (const color of ["#0E1424", "#F7F5F0", "#E8663A", "#D63F27", "#B42328", "#0A7552", "#8A5600", "#4B4BD8"]) {
+    assert.ok(tokens.includes(color), `token ${color} must stay in the palette`);
+  }
+}
+
+function assertSessionView() {
+  assert.equal(stripMarkdown("**Part 1 - Introduction and Interview**\n\nGood afternoon."), "Good afternoon.");
+  assert.equal(speakableText("Thank you. That is the end of Part 1 practice. Tap **Score** to view your report."), "Thank you. That is the end of Part 1 practice.");
+  const card = parseCueCard("Describe a building.\n\nYou should say:\n- what it is\n- where it is");
+  assert.equal(card.title, "Describe a building.");
+  assert.deepEqual(card.bullets, ["what it is", "where it is"]);
+  assert.deepEqual(progressFor(session()), { label: "Part 1", total: 4, current: 1 });
+  assert.equal(progressFor(session({ phase: "part3", part3_target_count: 4, part3_index: 2 })).current, 3);
+  const longTurn = session({ phase: "part2_long", current_question: "**Part 2 - Long Turn**\n\nDescribe a building.", cue_card: { prompt: "Describe a building.\n\nYou should say:\n- what it is" } });
+  assert.equal(displayQuestion(longTurn), "Describe a building.");
+  assert.match(displayQuestion({ ...longTurn, current_question: "Please continue - you still have time." }), /^Please continue/);
+}
+
+function assertFeedbackView() {
+  const answer = "Um I very like pop music.";
+  const segments = transcriptSegments(answer, PRACTICE_FEEDBACK);
+  assert.ok(segments.some((s) => s.type === "del" && s.text === "I very like"));
+  assert.ok(segments.some((s) => s.type === "ins" && s.text === "I really like"));
+  assert.ok(segments.some((s) => s.type === "filler"));
+  assert.equal(hasMarks(PRACTICE_FEEDBACK), true);
+  const fix = topFix(PRACTICE_FEEDBACK);
+  assert.equal(fix.label, "Top fix");
+  assert.equal(fix.to, "I really like");
+  const tipOnly = topFix({ ...PRACTICE_FEEDBACK, correction: null, tip: "Give one reason." });
+  assert.equal(tipOnly.label, "Next step");
+  assert.equal(topFix({ ...PRACTICE_FEEDBACK, coaching: false }), null, "mock answers never show a fix");
+  const chips = verdictChips(PRACTICE_FEEDBACK).map((chip) => chip.text);
+  assert.ok(chips.includes("On topic"));
+  assert.ok(chips.some((text) => text.startsWith("Pace")));
+  assert.ok(chips.includes("1 hesitation"));
+  // Diff edits from the backend render in order.
+  const diff = transcriptSegments("I go there yesterday.", { edits: [
+    { op: "equal", text: "I" }, { op: "replace", text: "go", replacement: "went" }, { op: "equal", text: "there yesterday ." },
+  ] });
+  assert.deepEqual(diff.filter((s) => s.type !== "text").map((s) => `${s.type}:${s.text}`), ["del:go", "ins:went"]);
+  // Retake compares locally and never invents improvements.
+  const turn = { answer, duration: 4, feedback: PRACTICE_FEEDBACK };
+  const better = compareRetake(turn, { text: "I really like pop music because it is fun.", duration: 6 });
+  assert.equal(better.improvedCount, 3);
+  assert.match(retakeHeadline(better), /everything right/);
+  const same = compareRetake(turn, { text: "Um I very like pop.", duration: 3 });
+  assert.equal(same.improvedCount, 0);
+}
+
+function assertReportParsing() {
+  const report = [
+    "## Overall band estimate", "Around 6.0 based on short answers.",
+    "## Skill breakdown",
+    "- **Fluency and Coherence:** answers are short.",
+    "- **Lexical Resource:** some repetition.",
+    "- **Grammar:** mostly accurate.",
+    "## Three recurring spoken-language problems", "1. Short answers.", "2. Vague words.", "3. Tense slips.",
+    "## Corrected examples", "> Original: I very like it.", "> Better: I really like it.",
+    "## Next-session practice tasks", "1. Add one reason.", "2. Add an example.",
+    "---", "## Session learning summary", "**Next-session focus:** Extend short answers with a clear reason.",
+  ].join("\n");
+  const parsed = parseReport(report);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.oneThing, "Extend short answers with a clear reason.");
+  assert.deepEqual(parsed.criteria.map((c) => c.title), ["Fluency", "Vocabulary", "Grammar", "Pronunciation"]);
+  assert.equal(parsed.criteria[3].comment, "Can't be judged from text.");
+  assert.equal(parsed.examples[0].better, "I really like it.");
+  assert.equal(parsed.tasks.length, 2);
+  assert.equal(parseReport("plain text").ok, false);
+}
+
 function assertReducerFlow() {
-  let state = createInitialAppState();
-  state = appReducer(
-    state,
-    sessionStartRequested({
-      practiceType: "part1",
-      selectedCueCardTitle: "",
-      selectedPart1Topic: "work or studies",
-      trainingMode: "practice",
-    }),
-  );
+  let state = appReducer(initialState, patch({ trainingMode: "practice", practiceType: "part1" }));
+  state = appReducer(state, sessionStarting());
   assert.equal(state.busy, "starting");
-  assert.equal(state.practiceType, "part1");
-  assert.equal(state.selectedPart1Topic, "work or studies");
+  state = appReducer(state, sessionStarted(session()));
+  assert.equal(state.screen, SCREENS.EXAM);
+  state = appReducer(state, answerSending({ question: "Do you like music?", phase: "part1", transcript: "I very like it.", source: "audio", duration: 4 }));
+  assert.equal(state.screen, SCREENS.MARKING);
+  assert.equal(state.marking.step, "marking");
+  const next = session({ part1_index: 2, current_question: "When do you listen?" });
+  const turn = { id: "t1", question: "Do you like music?", phase: "part1", answer: "I very like it.", source: "audio", duration: 4, feedback: PRACTICE_FEEDBACK, retakes: [] };
+  state = appReducer(state, answerSucceeded({ session: next, spoken_text: "When do you listen?", feedback: PRACTICE_FEEDBACK }, turn));
+  assert.equal(state.marking.step, "audio");
+  assert.equal(state.nextSpeech, "When do you listen?");
+  state = appReducer(state, markingStep("ready"));
+  state = appReducer(state, markingStep("done"));
+  assert.equal(state.screen, SCREENS.REVIEW);
+  state = appReducer(state, retakeStarted("t1"));
+  assert.equal(state.screen, SCREENS.EXAM);
+  state = appReducer(state, retakeDone("t1", "I really like it.", 3));
+  assert.equal(state.screen, SCREENS.RETAKE);
+  assert.equal(state.session.part1_index, 2, "retake must not advance the session");
+  assert.equal(state.turns[0].retakes.length, 1);
+  state = appReducer(state, nextQuestion());
+  assert.equal(state.screen, SCREENS.EXAM);
 
-  state = appReducer(state, sessionStartSucceeded(createSession({ voice_playback_enabled: false })));
-  assert.equal(state.busy, "");
-  assert.equal(state.audioEnabled, false);
-  assert.equal(state.selectedPart1Topic, "work or studies");
+  // Offline: the answer is kept for retry and the session is unchanged.
+  const before = state.session;
+  state = appReducer(state, answerSending({ question: "q", phase: "part1", transcript: "Hello there", source: "text", duration: null }));
+  state = appReducer(state, answerFailed({ kind: ERROR_KINDS.OFFLINE, message: "offline" }, { answer: "Hello there", source: "text", duration: null }));
+  assert.equal(state.session, before);
+  assert.equal(state.pendingAnswer.answer, "Hello there");
 
-  let randomTopicState = createInitialAppState();
-  randomTopicState = appReducer(
-    randomTopicState,
-    sessionStartRequested({
-      practiceType: "part1",
-      selectedCueCardTitle: "",
-      selectedPart1Topic: "",
-      trainingMode: "practice",
-    }),
-  );
-  randomTopicState = appReducer(
-    randomTopicState,
-    sessionStartSucceeded(createSession({ part1_topic: "music" })),
-  );
-  assert.equal(randomTopicState.selectedPart1Topic, "");
+  // Mock: no marking screen, straight to the next question.
+  let mock = appReducer({ ...initialState, trainingMode: "mock" }, sessionStarted(session({ practice_mode: false, phase: "identity" })));
+  mock = appReducer(mock, answerSending({ question: "q", phase: "identity", transcript: "Alex", source: "text", duration: null }));
+  assert.equal(mock.screen, SCREENS.EXAM);
+  mock = appReducer(mock, answerSucceeded({ session: session({ practice_mode: false }), spoken_text: "Do you work?" }, { id: "m1", feedback: { coaching: false } }));
+  assert.equal(mock.screen, SCREENS.EXAM);
+  mock = appReducer(mock, answerSucceeded({ session: session({ phase: "complete", test_active: false }), spoken_text: "Thank you." }, { id: "m2", feedback: { coaching: false } }));
+  assert.equal(mock.screen, SCREENS.RECAP);
 
-  state = appReducer(state, answerRequested());
-  assert.equal(state.busy, "thinking");
-  assert.equal(state.draft, "");
+  // Part 2 prep starts when the long turn begins.
+  const p2 = appReducer(initialState, sessionStarted(session({ phase: "part2_long" })));
+  assert.ok(p2.prepEndsAt > Date.now());
 
-  state = appReducer(state, answerSucceeded(createSession({ phase: "part1" })));
-  assert.equal(state.busy, "");
-  assert.equal(state.session.phase, "part1");
-}
-
-function assertInvalidAnswerFailurePreservesSession() {
-  const session = createSession({
-    current_question: "Do you like music?",
-    phase: "part1",
-  });
-  let state = { ...createInitialAppState(), draft: "... 123 ...", session };
-  state = appReducer(state, answerRequested());
-  state = appReducer(state, answerFailed(INVALID_ANSWER_MESSAGE));
-  assert.equal(state.busy, "");
-  assert.equal(state.error, INVALID_ANSWER_MESSAGE);
-  assert.equal(state.session, session);
-  assert.equal(state.session.current_question, "Do you like music?");
-  assert.equal(state.session.candidate_answers.length, 0);
-}
-
-function assertStageCardSelector() {
-  let state = createInitialAppState();
-  state = appReducer(state, practiceOptionsLoaded({ part1_topics: ["work"], cue_cards: [] }));
-  state = { ...state, practiceType: "part1", session: createSession({ phase: "identity" }) };
-  assert.equal(selectSessionView(state).showPart1TopicSelect, true);
-  assert.equal(selectSessionView(state).shouldShowStageCard, true);
-
-  state = {
-    ...state,
-    session: createSession({
-      phase: "part1",
-      messages: [
-        { role: "assistant", phase: "identity", content: "Could you tell me your full name?" },
-        { role: "user", phase: "identity", content: "My name is Water." },
-        { role: "assistant", phase: "part1", content: "Do you work, or are you a student?" },
-      ],
-      candidate_answers: [{ phase: "identity", answer: "My name is Water." }],
-    }),
-  };
-  assert.equal(selectSessionView(state).shouldShowStageCard, true);
-
-  state = {
-    ...state,
-    session: createSession({
-      phase: "part1",
-      candidate_answers: [{ phase: "part1", answer: "I study architecture." }],
-    }),
-  };
-  assert.equal(selectSessionView(state).showPart1TopicSelect, false);
-  assert.equal(selectSessionView(state).shouldShowStageCard, false);
-
-  state = appReducer(
-    createInitialAppState(),
-    practiceOptionsLoaded({ part1_topics: [], cue_cards: [{ title: "a useful skill" }] }),
-  );
-  state = {
-    ...state,
-    practiceType: "part3",
-    session: createSession({
-      phase: "part3",
-      candidate_answers: [{ phase: "part3", answer: "It helps people at work." }],
-    }),
-  };
-  assert.equal(selectSessionView(state).shouldShowStageCard, false);
-
-  state = { ...state, prepEndsAt: Date.now() + 30000, clockTick: Date.now() };
-  assert.equal(selectSessionView(state).shouldShowStageCard, true);
-}
-
-
-function assertMockModeSelectors() {
-  const baseMessages = [
-    { role: "assistant", phase: "identity", content: "Could you tell me your name?" },
-    { role: "user", phase: "identity", content: "My name is Water." },
-    { role: "assistant", phase: "part1", content: "Do you work, or are you a student?" },
-  ];
-  const practiceState = {
-    ...createInitialAppState(),
-    trainingMode: "practice",
-    session: createSession({ messages: baseMessages, practice_mode: true }),
-  };
-  assert.equal(selectMessages(practiceState).length, 3);
-  assert.equal(selectSessionView(practiceState).mockExam, null);
-
-  const mockPart1State = {
-    ...createInitialAppState(),
-    trainingMode: "mock",
-    session: createSession({
-      current_question: "Do you work, or are you a student?",
-      messages: baseMessages,
-      phase: "part1",
-      practice_mode: false,
-    }),
-  };
-  assert.equal(selectMessages(mockPart1State).length, 0);
-  assert.equal(selectSessionView(mockPart1State).mockExam.title, "Voice-first mock exam");
-  assert.equal(selectSessionView(mockPart1State).mockExam.showQuestionFallback, true);
-
-  const mockPart2State = {
-    ...createInitialAppState(),
-    trainingMode: "mock",
-    session: createSession({
-      messages: [
-        { role: "assistant", phase: "part2_long", content: "Part 2 cue card" },
-        { role: "user", phase: "part2_long", content: "Hidden transcript" },
-      ],
-      phase: "part2_long",
-      practice_mode: false,
-    }),
-  };
-  const visiblePart2Messages = selectMessages(mockPart2State);
-  assert.equal(visiblePart2Messages.length, 1);
-  assert.equal(visiblePart2Messages[0].content, "Part 2 cue card");
-}
-
-function assertCapabilities() {
-  const state = { ...createInitialAppState(), busy: "", session: createSession() };
-  assert.equal(selectCapabilities(state, false).canAnswer, true);
-  assert.equal(selectCapabilities(state, true).canAnswer, false);
-}
-
-function assertBrowserSpeechIOSGuard() {
-  installWindow();
-  setNavigator({
-    maxTouchPoints: 5,
-    platform: "iPhone",
-    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
-  });
-  assert.equal(browserSpeechTranscriptionIsSupported(), false);
+  // Restore keeps the client-held session (incl. adaptive profile) untouched.
+  const profile = { version: 1, state: "guided", observations: [], last_processed_answer_index: 3 };
+  const saved = session({ learner_support_profile: profile });
+  const restoredState = appReducer(initialState, restored({ session: saved, turns: [turn], trainingMode: "practice" }));
+  assert.equal(restoredState.session.learner_support_profile, profile);
+  assert.equal(restoredState.screen, SCREENS.EXAM);
+  assert.equal(appReducer(restoredState, goHome()).session, null);
 }
 
 async function assertApiErrorMapping() {
@@ -340,248 +217,54 @@ async function assertApiErrorMapping() {
     throw error;
   };
   await assert.rejects(healthCheck(), /timed out/);
-
   globalThis.fetch = async () => {
     throw new Error("network down");
   };
   await assert.rejects(healthCheck(), /not reachable/);
-
-  globalThis.fetch = async () => ({
-    ok: false,
-    status: 422,
-    statusText: "Unprocessable Entity",
-    json: async () => ({ detail: INVALID_ANSWER_MESSAGE }),
-  });
-  await assert.rejects(
-    sendAnswer({ session: createSession(), answer: "... 123 ...", source: "text", duration: null }),
-    { message: INVALID_ANSWER_MESSAGE },
-  );
-  assert.equal(friendlyError(new Error(INVALID_ANSWER_MESSAGE), "fallback"), INVALID_ANSWER_MESSAGE);
-  assert.match(friendlyError(new Error("No clear speech was detected."), "fallback"), /Type it below, or tap Voice to record again/);
-  assert.match(friendlyError(new Error("Recording is too short."), "fallback"), /Type your answer below, or tap Voice to record again/);
-  assert.match(friendlyError(new Error("Audio transcription failed."), "fallback"), /Type your answer below, or tap Voice to record again/);
-  assert.deepEqual(transcriptionRecovery(new Error("Recording is too short.")), {
-    message: "The recording was too short to detect an answer. Tap Voice to record again, or type your answer below.",
-    retryAudio: false,
-  });
-  assert.match(transcriptionRecovery(new Error("No clear speech was detected.")).message, /try answering in English again/);
-  assert.equal(transcriptionRecovery(new Error("No clear speech was detected.")).retryAudio, false);
-  assert.deepEqual(transcriptionRecovery(new Error("Clearly silent recording.")), {
-    message: "No sound was detected. Tap Voice to record again, or type your answer below.",
-    retryAudio: false,
-  });
-  assert.equal(transcriptionRecovery(Object.assign(new Error("Audio is too large"), { status: 413 })).retryAudio, false);
-  assert.equal(transcriptionRecovery(Object.assign(new Error("Too many requests"), { status: 429 })).retryAudio, false);
-  assert.equal(transcriptionRecovery(new Error("Microphone permission denied")).retryAudio, false);
+  globalThis.fetch = async () => ({ ok: false, status: 422, statusText: "Unprocessable Entity", json: async () => ({ detail: INVALID_ANSWER_MESSAGE }) });
+  await assert.rejects(sendAnswer({ session: session(), answer: "... 123 ...", source: "text", duration: null }), { message: INVALID_ANSWER_MESSAGE });
+  assert.equal(transcriptionRecovery(new Error("Clearly silent recording.")).kind, ERROR_KINDS.SILENT);
+  assert.equal(transcriptionRecovery(new Error("Microphone permission denied")).kind, ERROR_KINDS.MIC);
   assert.equal(transcriptionRecovery(Object.assign(new Error("Audio transcription is temporarily unavailable"), { status: 502 })).retryAudio, true);
-  assert.equal(transcriptionRecovery(new Error("Victoria's server is not reachable")).retryAudio, true);
-  assert.equal(transcriptionRecovery(new Error("Unexpected recording error")).retryAudio, false);
-}
+  assert.equal(transcriptionRecovery(new Error("Victoria's server is not reachable")).kind, ERROR_KINDS.OFFLINE);
+  assert.equal(transcriptionRecovery(Object.assign(new Error("Too many requests"), { status: 429 })).retryAudio, false);
+  assert.equal(friendlyError(new Error(INVALID_ANSWER_MESSAGE), "fallback"), INVALID_ANSWER_MESSAGE);
 
-async function assertTtsFailureMapping() {
-  installWindow();
-  setNavigator({ maxTouchPoints: 0, onLine: true, platform: "Win32", userAgent: "Node" });
   assert.equal(TTS_TIMEOUT_MS, 12000);
-
-  globalThis.fetch = async (url, options) => {
-    assert.match(String(url), /\/api\/tts$/);
-    assert.equal(options?.method, "POST");
-    const payload = JSON.parse(String(options?.body || "{}"));
-    assert.equal(payload.text, "Hello");
-    assert.equal(payload.session_id, "session-1");
+  globalThis.fetch = async () => {
     const error = new Error("aborted");
     error.name = "AbortError";
     throw error;
   };
-  await assert.rejects(synthesizeSpeech("Hello", "session-1"), new RegExp(VOICE_UNAVAILABLE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.equal(
-    friendlyError(new Error(VOICE_UNAVAILABLE_MESSAGE), "fallback"),
-    VOICE_UNAVAILABLE_MESSAGE,
-  );
+  await assert.rejects(synthesizeSpeech("Hello", "s-1"), /can't speak right now/);
+  assert.equal(friendlyError(new Error(VOICE_UNAVAILABLE_MESSAGE), "fallback"), VOICE_UNAVAILABLE_MESSAGE);
 
-  globalThis.fetch = async () => ({
-    ok: false,
-    status: 504,
-    statusText: "Gateway Timeout",
-    json: async () => ({ detail: VOICE_UNAVAILABLE_MESSAGE }),
-  });
-  await assert.rejects(synthesizeSpeech("Hello", "session-1"), new RegExp(VOICE_UNAVAILABLE_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.equal(
-    friendlyError(new Error("Request timed out. Victoria's server may be waking up; please try again."), "fallback"),
-    "Victoria's server is taking too long to respond. It may be waking up, so please try again in a moment.",
-  );
-}
-
-function assertTtsFailurePreservesAnswerState() {
-  const previousSession = createSession({
-    phase: "part1",
-    current_question: "Do you work, or are you a student?",
-    candidate_answers: [{ phase: "identity", answer: "My name is Water." }],
-  });
-  const nextSession = createSession({
-    phase: "part1",
-    current_question: "What do you like about your studies?",
-    candidate_answers: [
-      { phase: "identity", answer: "My name is Water." },
-      { phase: "part1", answer: "I study architecture." },
-    ],
-    messages: [
-      { role: "user", phase: "part1", content: "I study architecture." },
-      { role: "assistant", phase: "part1", content: "What do you like about your studies?" },
-    ],
-  });
-  let state = { ...createInitialAppState(), session: previousSession, busy: "thinking" };
-  state = appReducer(state, answerSucceeded(nextSession));
-  state = appReducer(state, errorSet(VOICE_UNAVAILABLE_MESSAGE));
-  assert.equal(state.error, VOICE_UNAVAILABLE_MESSAGE);
-  assert.equal(state.busy, "");
-  assert.equal(state.session.current_question, "What do you like about your studies?");
-  assert.equal(state.session.candidate_answers.length, 2);
-  assert.equal(state.session.messages.at(-1).content, "What do you like about your studies?");
-}
-
-
-function assertRuntimeDiagnosticsUtilities() {
-  const wechat = analyzeUserAgent(
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) MicroMessenger/8.0",
-    "iPhone",
-    5,
-  );
-  assert.equal(wechat.isWeChat, true);
-  assert.equal(wechat.isIOS, true);
-  assert.equal(wechat.deviceType, "mobile");
-
-  const android = analyzeUserAgent("Mozilla/5.0 (Linux; Android 14) Chrome/120", "Linux armv8", 5);
-  assert.equal(android.isAndroid, true);
-
-  const page = getPageEnvironment({
-    location: { protocol: "http:", hostname: "example.test" },
-    navigator: { userAgent: "Desktop", platform: "Win32", maxTouchPoints: 0 },
-    secureContext: false,
-  });
-  assert.equal(page.https, false);
-  assert.equal(page.secureContext, false);
-
-  const noRecording = getRecordingSupport({ navigator: {}, window: {} });
-  assert.equal(noRecording.mediaDevices, false);
-  assert.equal(noRecording.getUserMedia, false);
-  assert.equal(noRecording.mediaRecorder, false);
-
-  const withRecording = getRecordingSupport({
-    navigator: { mediaDevices: { getUserMedia() {} } },
-    window: { MediaRecorder: { isTypeSupported: (type) => type === "audio/webm" } },
-  });
-  assert.equal(withRecording.mediaDevices, true);
-  assert.equal(withRecording.getUserMedia, true);
-  assert.equal(withRecording.mediaRecorder, true);
-  assert.equal(withRecording.mimeSupport["audio/webm"], true);
-
-  const unavailableStorage = checkLocalStorage({
-    setItem() {
-      throw new Error("blocked");
-    },
-    removeItem() {},
-  });
-  assert.equal(unavailableStorage.available, false);
-
-  const copyText = buildDiagnosticCopyText({
-    time: "2026-07-12T00:00:00.000Z",
-    environment: { userAgent: "UA", deviceType: "desktop", isWeChat: false, isIOS: false, isAndroid: false, https: true, secureContext: true },
-    recording: { mediaDevices: false, getUserMedia: false, mediaRecorder: false, mimeSupport: {} },
-    api: { status: "failed", elapsedMs: 12, token: "redacted-token", api_key: "redacted-api-key" },
-    playback: { status: "not tested" },
-    storage: { available: true },
-  });
-  assert.doesNotMatch(copyText, /redacted-token|redacted-api-key|api_key|cookie/i);
-}
-
-async function assertRuntimeDiagnosticsApiMapping() {
-  installWindow();
-  setNavigator({ maxTouchPoints: 0, onLine: true, platform: "Win32", userAgent: "Node" });
   globalThis.fetch = async (url) => {
     assert.match(String(url), /\/api\/diagnostics\/runtime$/);
-    return {
-      ok: true,
-      json: async () => ({ status: "ok", llm_configured: false, stt_configured: false }),
-    };
+    return { ok: true, json: async () => ({ status: "ok" }) };
   };
-  const payload = await fetchRuntimeDiagnostics();
-  assert.equal(payload.status, "ok");
-}
-function assertTelemetryFailureIsNonBlocking() {
-  installWindow();
-  setNavigator({
-    maxTouchPoints: 1,
-    onLine: true,
-    platform: "iPhone",
-    sendBeacon: () => false,
-    userAgent: "Node",
-  });
+  assert.equal((await fetchRuntimeDiagnostics()).status, "ok");
+
+  setNavigator({ maxTouchPoints: 1, onLine: true, platform: "iPhone", sendBeacon: () => false, userAgent: "Node" });
   globalThis.fetch = () => Promise.reject(new Error("telemetry down"));
-  assert.doesNotThrow(() => sendTelemetryEvent("smoke-test", { durationMs: 1, text: "redacted upstream" }));
+  assert.doesNotThrow(() => sendTelemetryEvent("smoke-test", { durationMs: 1 }));
 }
 
-function assertChatBottomAnchorContracts() {
-  const chatPanel = readFileSync("./src/components/layout/ChatPanel.jsx", "utf8");
-  const mobileCss = readFileSync("./src/styles/mobile.css", "utf8");
-  const browserEffects = readFileSync("./src/hooks/useBrowserEffects.js", "utf8");
-
-  assert.match(chatPanel, /className="chat-bottom-anchor"/);
-  assert.match(chatPanel, /data-testid="chat-bottom-anchor"/);
-  assert.match(chatPanel, /ref=\{bottomRef\}/);
-  assert.match(chatPanel, /className="chat-scroll-slack"/);
-  assert.match(chatPanel, /data-testid="mock-exam-card"/);
-  assert.match(chatPanel, /data-testid="replay-question-button"/);
-  const app = readFileSync("./src/App.jsx", "utf8");
-  const header = readFileSync("./src/components/layout/ExamHeader.jsx", "utf8");
-  const diagnosticsPanel = readFileSync("./src/components/layout/RuntimeDiagnosticsPanel.jsx", "utf8");
-  assert.match(app, /RuntimeDiagnosticsPanel/);
-  assert.doesNotMatch(header, /data-testid="runtime-diagnostics-button"/);
-  assert.equal(
-    (header.match(/data-testid="mobile-runtime-diagnostics-button"/g) || []).length,
-    1,
-  );
-  assert.match(header, /onClick=\{openRuntimeDiagnostics\} data-testid="mobile-runtime-diagnostics-button"/);
-  assert.match(header, /<summary>More<\/summary>/);
-  assert.match(header, /data-testid="mobile-sound-toggle"/);
-  assert.match(header, /data-testid="mobile-score-button"/);
-  assert.match(header, /data-testid="mobile-export-button"/);
-  assert.match(header, /data-testid="mobile-restart-button"/);
-  assert.match(diagnosticsPanel, /data-testid="copy-diagnostics-button"/);
-  assert.match(diagnosticsPanel, /请使用 Safari 或 Chrome 打开/);
-  assert.match(chatPanel, /data-testid="mock-question-fallback"/);
-  assert.match(chatPanel, /data-testid="chat-scroll-slack"/);
-  assert.doesNotMatch(mobileCss, /\.chat-panel\s*>\s*\.message-row:first-child\s*\{[^}]*margin-top:\s*auto/s);
-  assert.match(mobileCss, /padding-top:\s*clamp\(16px,\s*3vh,\s*32px\)/);
-  assert.match(mobileCss, /\.chat-bottom-anchor\s*\{[^}]*flex-basis:\s*calc\(124px \+ env\(safe-area-inset-bottom\)\)/s);
-  assert.match(browserEffects, /useLayoutEffect/);
-  assert.match(browserEffects, /SHORT_SCROLL_SLACK_PX\s*=\s*48/);
-  assert.match(browserEffects, /updateShortScrollSlack/);
-  assert.match(browserEffects, /answerCount\s*===\s*0/);
-  assert.match(browserEffects, /contentBottomBeforeAnchor/);
-  assert.match(browserEffects, /visibleSafeHeight/);
-  assert.match(browserEffects, /shouldFollowBottom/);
-  assert.match(browserEffects, /shortScrollSlackHeight/);
-  assert.match(browserEffects, /scrollIntoView\(\{\s*behavior,\s*block:\s*"end"/s);
-  assert.match(browserEffects, /distanceFromBottom/);
+function assertBrowserGuards() {
+  installWindow();
+  setNavigator({ maxTouchPoints: 5, platform: "iPhone", userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)" });
+  assert.equal(browserSpeechTranscriptionIsSupported(), false, "iOS uses the server transcription path");
+  assert.equal(analyzeUserAgent("Mozilla/5.0 MicroMessenger/8.0", "iPhone", 5).isWeChat, true);
+  const copy = buildDiagnosticCopyText({ environment: {}, recording: {}, api: { status: "ok", token: "secret-token" }, playback: {}, storage: {} });
+  assert.doesNotMatch(copy, /secret-token/);
 }
 
 await assertApiErrorMapping();
-await assertTtsFailureMapping();
 assertProductMetadata();
-assertContextualFeedbackPlaybackHint();
-assertTourPositioning();
-assertTourSelectionSteps();
-assertBrowserSpeechIOSGuard();
-assertCapabilities();
-assertMockModeSelectors();
-assertChatBottomAnchorContracts();
+assertSessionView();
+assertFeedbackView();
+assertReportParsing();
 assertReducerFlow();
-assertInvalidAnswerFailurePreservesSession();
-assertTtsFailurePreservesAnswerState();
-assertStageCardSelector();
-assertTelemetryFailureIsNonBlocking();
-assertRuntimeDiagnosticsUtilities();
-await assertRuntimeDiagnosticsApiMapping();
+assertBrowserGuards();
 
 console.log("Frontend smoke test passed");

@@ -21,6 +21,10 @@ Current PowerShell tooling is in `scripts/`, current operating documents are in 
 
 V2 remains preserved by tag `v2.0.0`, its frozen commit, QA records, and Railway historical reference. `main` no longer represents the V2 branch.
 
+## V4 development note
+
+V4 (coach UI) is developed on branch `v4/coach-ui` inside the same `frontend/`, `backend/`, and `scripts/` roots. Read `docs/V4_HANDOFF.md` first. V4 replaced the V3 chat-layout frontend (`components/layout`, `components/messages`, `styles.css`, `styles/mobile.css`, `state/selectors.js`); do not reintroduce them. V4 did not change Prompt, question bank, scoring, Practice/Mock rules, or provider behavior; the new `/api/answer` `feedback` object is derived deterministically from existing outputs. `scripts/run_fake_backend.py` is a local-only fake provider for UI work and must never be used for deployment.
+
 ## Branch discipline
 
 For normal work:

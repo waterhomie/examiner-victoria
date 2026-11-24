@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { splitFeedbackPlayback } from "./src/utils/feedbackPlayback.js";
 
 // Exercise the real hook with deterministic hooks and a delayed browser play().
 // A synchronous Audio mock would miss cancellation of Safari's unlock promise.
@@ -74,8 +73,8 @@ function createPlaybackHarness() {
   };
 }
 
-const feedback = '**A natural version of your answer:**\n\n> I enjoy walking in the park.\n> It helps me relax.\n\nWhat do you study?';
-const naturalText = splitFeedbackPlayback(feedback).find((section) => section.label === "Natural version").text;
+// V4: the review screen passes the natural version text directly.
+const naturalText = "I enjoy walking in the park.\nIt helps me relax.";
 
 // Sound off still permits an explicit Natural version tap, with no next question.
 {

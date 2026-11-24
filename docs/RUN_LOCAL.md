@@ -100,3 +100,26 @@ Stop both the local app and tunnel with:
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File .\scripts\stop_local_stack.ps1 -Ports "8010,5174"
 ```
+
+## V4 UI work without provider keys
+
+For frontend work on the V4 coach UI you can run a fake backend that patches
+the model, TTS, and STT calls with deterministic local fakes (no network, no
+keys, no `.env` needed):
+
+```bash
+python scripts/run_fake_backend.py          # FastAPI on http://127.0.0.1:8010
+cd frontend && pnpm dev                     # Vite proxies /api to :8010
+```
+
+or build once (`pnpm build`) and open `http://127.0.0.1:8010`. The fake
+backend is for UI development only. It never changes real provider behavior
+and must not be deployed.
+
+V4 focused checks:
+
+```bash
+python -m backend.answer_feedback_test
+python -m backend.smoke_test
+cd frontend && pnpm run test:smoke && pnpm run build
+```

@@ -1,360 +1,315 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { AnswerComposer } from "./components/layout/AnswerComposer.jsx";
-import { ChatPanel } from "./components/layout/ChatPanel.jsx";
-import { ExamHeader } from "./components/layout/ExamHeader.jsx";
-import { GuidedTour } from "./components/layout/GuidedTour.jsx";
-import { getTourSelectionKind } from "./components/layout/tourSteps.js";
-import { ExamStageCard } from "./components/layout/ExamStageCard.jsx";
-import { MobileToasts } from "./components/layout/MobileToasts.jsx";
-import { RuntimeDiagnosticsPanel } from "./components/layout/RuntimeDiagnosticsPanel.jsx";
-import { PRACTICE_TYPES, STORAGE_KEY, TRAINING_MODES } from "./config/appConfig.js";
-import {
-  useAutoScrollToLatest,
-  useFrontendErrorTelemetry,
-  usePagehideCleanup,
-  usePrepCountdown,
-  useScrollStateTelemetry,
-} from "./hooks/useBrowserEffects.js";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { DESKTOP_QUERY, MEMO_KEY, PART2_MAX_SECONDS, STORAGE_KEY } from "./config/appConfig.js";
 import { useAnswerRecording } from "./hooks/useAnswerRecording.js";
+import {
+  useFrontendErrorTelemetry,
+  useHoldToTalk,
+  useMediaQuery,
+  useOnlineStatus,
+  usePrepCountdown,
+} from "./hooks/useBrowserEffects.js";
 import { useExamController } from "./hooks/useExamController.js";
 import { useSpeechPlayback } from "./hooks/useSpeechPlayback.js";
+import { patch, restored, setError } from "./state/actions.js";
 import { appReducer } from "./state/appReducer.js";
-import { busySet, draftSet, errorSet, modeSet, sessionRestored, storageReadySet } from "./state/actions.js";
-import { createInitialAppState } from "./state/initialState.js";
-import { selectCapabilities, selectMessages, selectSessionView } from "./state/selectors.js";
-import { formatDuration } from "./utils/format.js";
-import { busyLabel, phaseLabel } from "./utils/labels.js";
-import { saveSessionSnapshot } from "./utils/sessionStorage.js";
+import { initialState, SCREENS } from "./state/initialState.js";
+import { ErrorCard, VoiceBanner } from "./components/ErrorCard.jsx";
+import { SettingsSheet, TypeSheet } from "./components/Sheets.jsx";
+import { CallScreen } from "./components/screens/CallScreen.jsx";
+import { ExamScreen } from "./components/screens/ExamScreen.jsx";
+import { HomeScreen } from "./components/screens/HomeScreen.jsx";
+import { MarkingScreen } from "./components/screens/MarkingScreen.jsx";
+import { RecapScreen } from "./components/screens/RecapScreen.jsx";
+import { RetakeScreen } from "./components/screens/RetakeScreen.jsx";
+import { ReviewScreen } from "./components/screens/ReviewScreen.jsx";
+import { loadMemo } from "./utils/memo.js";
+import { getPageEnvironment } from "./utils/runtimeDiagnostics.js";
+import { clearSavedSession, loadSavedSession, saveSessionSnapshot } from "./utils/sessionStorage.js";
+import { displayQuestion, isSessionComplete } from "./utils/sessionView.js";
+
+const SESSION_SCREENS = new Set([SCREENS.EXAM, SCREENS.MARKING, SCREENS.REVIEW, SCREENS.RETAKE]);
 
 export default function App() {
-  const [state, dispatch] = useReducer(appReducer, undefined, createInitialAppState);
-  const chatPanelRef = useRef(null);
-  const bottomRef = useRef(null);
-  const shortScrollSlackRef = useRef(null);
-  const startupRecoveryAttemptedRef = useRef(false);
-  const submitAnswerRef = useRef(null);
-  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
-  const [guideReplayRequest, setGuideReplayRequest] = useState(0);
+  const [state, dispatch] = useReducer(appReducer, initialState);
+  const [memo, setMemo] = useState(() => loadMemo(MEMO_KEY));
+  const [resume, setResume] = useState(() => {
+    const saved = loadSavedSession(STORAGE_KEY);
+    return saved?.session && !isSessionComplete(saved.session) ? saved : null;
+  });
+  const desktop = useMediaQuery(DESKTOP_QUERY);
+  const online = useOnlineStatus();
+  const environment = useMemo(() => getPageEnvironment(), []);
+  const captionsOn = state.captions ?? state.trainingMode === "practice";
+  const controllerRef = useRef(null);
 
-  const setBusy = useCallback((busy) => dispatch(busySet(busy)), []);
-  const setDraft = useCallback((draft) => dispatch(draftSet(draft)), []);
-  const setError = useCallback((error) => dispatch(errorSet(error)), []);
-  const setMode = useCallback((mode) => dispatch(modeSet(mode)), []);
-  const submitAnswerFromRecording = useCallback(
-    (...args) => submitAnswerRef.current?.(...args),
-    [],
+  useFrontendErrorTelemetry();
+
+  const speech = useSpeechPlayback({
+    audioEnabled: state.audioEnabled,
+    onErrorChange: useCallback((message) => dispatch(patch({ voiceIssue: message || "" })), []),
+  });
+
+  const onTranscribed = useCallback(async (text, duration) => {
+    if (state.retake && !state.retake.text) {
+      controllerRef.current?.finishRetake(text, duration);
+      return;
+    }
+    await controllerRef.current?.submitAnswer(text, "audio", duration);
+  }, [state.retake]);
+
+  const onRecordingError = useCallback((recovery) => {
+    dispatch(setError({ kind: recovery.kind, message: recovery.message, canRetry: recovery.canRetry }));
+  }, []);
+
+  const recorder = useAnswerRecording({
+    onTranscribed,
+    onError: onRecordingError,
+    maxSeconds: state.session?.phase === "part2_long" ? PART2_MAX_SECONDS : 0,
+  });
+
+  const controller = useExamController({ state, dispatch, speech, recordingReset: recorder.resetRecording });
+  controllerRef.current = controller;
+
+  usePrepCountdown(
+    state.prepEndsAt,
+    useCallback((value) => dispatch(patch({ prepEndsAt: value })), []),
+    useCallback((value) => dispatch(patch({ clockTick: value })), []),
   );
 
-  const {
-    clearPendingSpeech,
-    speechState,
-    pendingSpeechUrl,
-    playPendingSpeech,
-    playSpeech,
-    unlockAudio,
-    stopCurrentAudio,
-  } = useSpeechPlayback({
-    audioEnabled: state.audioEnabled,
-    onErrorChange: setError,
-  });
-
-  const {
-    beginRetake,
-    cancelRecording,
-    canRetryRecording,
-    cleanupRecording,
-    discardReviewedDraft,
-    elapsed,
-    keepPreviousDraft,
-    recording,
-    replacementDraft,
-    resetRecording,
-    reviewedRecording,
-    retryLastRecording,
-    toggleRecording,
-    useReplacementDraft,
-  } = useAnswerRecording({
-    busy: state.busy,
-    draft: state.draft,
-    onBusyChange: setBusy,
-    onDraftChange: setDraft,
-    onErrorChange: setError,
-    onModeChange: setMode,
-    reviewBeforeSend: state.reviewBeforeSend,
-    submitAnswer: submitAnswerFromRecording,
-  });
-
-  const capabilities = selectCapabilities(state, recording);
-  const controller = useExamController({
-    canAnswer: capabilities.canAnswer,
-    clearPendingSpeech,
-    dispatch,
-    playSpeech,
-    resetRecording,
-    state,
-    stopCurrentAudio,
-    unlockAudio,
-  });
-  submitAnswerRef.current = controller.submitAnswer;
-
-  const messages = selectMessages(state);
-  const lastMessage = messages[messages.length - 1] || null;
-  const answerCount = state.session?.candidate_answers?.length || 0;
-  const lastMessageKey = lastMessage
-    ? `${messages.length}:${lastMessage.role}:${lastMessage.phase || ""}:${lastMessage.content || ""}`
-    : "";
-  const currentPhase = phaseLabel(state.session?.phase);
-  const sessionView = selectSessionView(state);
-  const recordButtonDisabled = recording ? false : !capabilities.canStartRecording;
-  const recordButtonText = !state.session
-    ? "Starting..."
-    : state.session.test_active
-      ? recording
-        ? state.reviewBeforeSend ? "Stop & review" : "Tap to send"
-        : "Tap to record"
-      : "Test complete";
-
+  // Refresh the "From last time" memo whenever we land on Home.
   useEffect(() => {
-    let restored = false;
-    const saved = controller.restoreSavedSession();
-    if (saved?.session?.messages?.length) {
-      dispatch(sessionRestored(saved));
-      restored = true;
-    }
-    dispatch(storageReadySet(true));
-    if (!restored) {
-      void controller.createFreshSession();
-    }
-    return () => {
-      cleanupRecording();
-      stopCurrentAudio();
-    };
-    // Run once for startup wiring; the controller uses the initial settings here.
+    if (state.screen === SCREENS.HOME) setMemo(loadMemo(MEMO_KEY));
+  }, [state.screen]);
+
+  // Load health + practice options once.
+  useEffect(() => {
+    void controller.loadBackendStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep a device-local snapshot so a refresh can resume the session.
   useEffect(() => {
-    void controller.loadBackendStatus();
-  }, [controller.loadBackendStatus]);
+    if (!state.session) return;
+    saveSessionSnapshot(STORAGE_KEY, {
+      session: state.session,
+      turns: state.turns,
+      trainingMode: state.trainingMode,
+      practiceType: state.practiceType,
+      report: state.report,
+    });
+  }, [state.practiceType, state.report, state.session, state.trainingMode, state.turns]);
 
+  // Offline: auto-retry the saved answer when the connection comes back.
   useEffect(() => {
-    if (!state.storageReady || state.session || state.busy || startupRecoveryAttemptedRef.current) return;
-    startupRecoveryAttemptedRef.current = true;
-    void controller.createFreshSession();
-  }, [controller.createFreshSession, state.busy, state.session, state.storageReady]);
+    if (!online) return;
+    if (state.pendingAnswer && state.busy !== "sending") controller.retryPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
 
+  // Desktop: the review lives in the right pane, so move on at once.
   useEffect(() => {
-    if (!state.storageReady) return;
-    saveSessionSnapshot(
-      STORAGE_KEY,
-      state.session
-        ? {
-            session: state.session,
-            report: state.report,
-            audioEnabled: state.audioEnabled,
-            trainingMode: state.trainingMode,
-            practiceType: state.practiceType,
-            selectedPart1Topic: state.selectedPart1Topic,
-            selectedCueCardTitle: state.selectedCueCardTitle,
-            reviewBeforeSend: state.reviewBeforeSend,
-            prepEndsAt: state.prepEndsAt,
-          }
-        : null,
-    );
-  }, [
-    state.audioEnabled,
-    state.practiceType,
-    state.prepEndsAt,
-    state.report,
-    state.reviewBeforeSend,
-    state.selectedCueCardTitle,
-    state.selectedPart1Topic,
-    state.session,
-    state.storageReady,
-    state.trainingMode,
-  ]);
+    if (desktop && state.screen === SCREENS.REVIEW) controller.goNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desktop, state.screen]);
 
-  useAutoScrollToLatest(chatPanelRef, bottomRef, shortScrollSlackRef, {
-    answerCount,
-    lastMessageKey,
-    messageCount: messages.length,
-    triggers: [
-      answerCount,
-      messages.length,
-      state.busy,
-      state.report,
-      sessionView.shouldShowStageCard,
-      lastMessageKey,
-      pendingSpeechUrl,
-    ],
-  });
-  useScrollStateTelemetry(chatPanelRef, bottomRef, shortScrollSlackRef, {
-    answerCount,
-    lastMessagePhase: lastMessage?.phase,
-    lastMessageRole: lastMessage?.role,
-    messageCount: messages.length,
-    phase: state.session?.phase,
-    practiceType: state.practiceType,
-    stageVisible: sessionView.shouldShowStageCard,
-  });
-  usePrepCountdown(state.prepEndsAt, controller.setPrepEndsAt, controller.setClockTick);
-  usePagehideCleanup(stopCurrentAudio);
-  useFrontendErrorTelemetry();
+  const clearError = useCallback(() => dispatch(setError(null)), []);
+  const openSheet = useCallback((sheet) => dispatch(patch({ sheet })), []);
+  const closeSheet = useCallback(() => dispatch(patch({ sheet: "" })), []);
 
-  const replayCurrentQuestion = useCallback(() => {
-    const question = state.session?.current_question;
-    if (question) void playSpeech(question, state.session?.session_id);
-  }, [playSpeech, state.session?.current_question, state.session?.session_id]);
+  const startMic = useCallback(async () => {
+    speech.stopCurrentAudio();
+    dispatch(patch({ voiceIssue: "" }));
+    clearError();
+    await recorder.start();
+  }, [clearError, recorder, speech]);
 
-  const handleToggleRecording = useCallback(() => {
-    if (!recording) {
-      stopCurrentAudio();
-    }
-    unlockAudio();
-    void toggleRecording();
-  }, [recording, stopCurrentAudio, toggleRecording, unlockAudio]);
+  const toggleMic = useCallback(() => {
+    if (recorder.recording) void recorder.stop();
+    else void startMic();
+  }, [recorder, startMic]);
 
-  const playFeedback = useCallback((text) => {
-    if (state.busy || recording) return;
-    setError("");
-    if (speechState.text === text) {
-      if (speechState.status === "pending") {
-        void playPendingSpeech();
-        return;
+  const startPart2 = useCallback(() => {
+    dispatch(patch({ part2Started: true, prepEndsAt: null }));
+    void startMic();
+  }, [startMic]);
+
+  const sendTyped = useCallback((text) => {
+    closeSheet();
+    if (state.retake && !state.retake.text) controller.finishRetake(text, null);
+    else void controller.submitAnswer(text, "text", null);
+  }, [closeSheet, controller, state.retake]);
+
+  const inExam = SESSION_SCREENS.has(state.screen) && Boolean(state.session);
+  useHoldToTalk({
+    enabled: desktop && inExam && !state.sheet && !state.error && state.busy !== "sending",
+    onPress: () => {
+      if (!recorder.recording && !recorder.transcribing) {
+        if (state.session?.phase === "part2_long") dispatch(patch({ part2Started: true, prepEndsAt: null }));
+        void startMic();
       }
-      stopCurrentAudio();
-      clearPendingSpeech();
-      return;
+    },
+    onRelease: () => {
+      if (recorder.recording) void recorder.stop();
+    },
+  });
+
+  const activeTurn = state.turns.find((turn) => turn.id === state.activeTurnId) || null;
+  const activeIndex = activeTurn ? state.turns.indexOf(activeTurn) + 1 : 0;
+  const retakeTurn = state.retake ? state.turns.find((turn) => turn.id === state.retake.turnId) : null;
+  const complete = isSessionComplete(state.session);
+
+  const goHome = useCallback(() => {
+    controller.endSession();
+    clearSavedSession(STORAGE_KEY);
+    setResume(null);
+  }, [controller]);
+
+  const exam = (
+    <ExamScreen
+      state={{ ...state, retake: state.retake && !state.retake.text ? state.retake : null }}
+      recorder={recorder}
+      speechState={speech.speechState}
+      captionsOn={captionsOn}
+      desktop={desktop}
+      onToggleMic={toggleMic}
+      onReplay={controller.replayQuestion}
+      onType={() => openSheet("type")}
+      onOpenSettings={() => openSheet("settings")}
+      onStartPart2={startPart2}
+      onCancelRetake={controller.cancelRetake}
+    />
+  );
+
+  let content;
+  if (state.screen === SCREENS.HOME || (!state.session && state.screen !== SCREENS.CALL)) {
+    content = (
+      <HomeScreen
+        state={state}
+        memo={memo}
+        resume={resume}
+        onChange={(values) => dispatch(patch(values))}
+        onStart={() => dispatch(patch({ screen: SCREENS.CALL, error: null }))}
+        onResume={() => {
+          dispatch(restored(resume));
+          setResume(null);
+        }}
+        onOpenSettings={() => openSheet("settings")}
+      />
+    );
+  } else if (state.screen === SCREENS.CALL) {
+    content = <CallScreen state={state} onCall={controller.startCall} onBack={() => dispatch(patch({ screen: SCREENS.HOME, error: null }))} />;
+  } else if (state.screen === SCREENS.RECAP) {
+    content = (
+      <RecapScreen
+        state={state}
+        onRetry={controller.requestReport}
+        onHome={goHome}
+        onDownload={controller.downloadRecord}
+        onListen={controller.listen}
+      />
+    );
+  } else if (desktop) {
+    let right;
+    if (state.marking) right = <MarkingScreen marking={state.marking} turn={activeTurn} />;
+    else if (state.retake?.text && retakeTurn) {
+      right = <RetakeScreen turn={retakeTurn} retake={state.retake} complete={complete} embedded onTryAgain={() => controller.startRetake(retakeTurn.id)} onNext={controller.goNext} />;
+    } else if (activeTurn?.feedback?.coaching) {
+      right = <ReviewScreen turn={activeTurn} index={activeIndex} complete={complete} embedded onRetake={() => controller.startRetake(activeTurn.id)} onListen={controller.listen} />;
+    } else {
+      right = (
+        <main className="screen paper desk-empty">
+          <p className="kicker">REVIEW</p>
+          <p className="serif">{state.trainingMode === "mock" ? "Mock test: feedback comes at the end." : "Your feedback will appear here after each answer."}</p>
+        </main>
+      );
     }
-    void playSpeech(text, state.session?.session_id, { manual: true });
-  }, [clearPendingSpeech, playPendingSpeech, playSpeech, recording, setError, speechState.status, speechState.text, state.busy, state.session?.session_id, stopCurrentAudio]);
+    content = <div className="desk">{exam}{right}</div>;
+  } else if (state.screen === SCREENS.MARKING) {
+    content = <MarkingScreen marking={state.marking} turn={activeTurn} />;
+  } else if (state.screen === SCREENS.REVIEW) {
+    content = (
+      <ReviewScreen
+        turn={activeTurn}
+        index={activeIndex}
+        complete={complete}
+        onRetake={() => controller.startRetake(activeTurn.id)}
+        onNext={controller.goNext}
+        onListen={controller.listen}
+      />
+    );
+  } else if (state.screen === SCREENS.RETAKE) {
+    content = (
+      <RetakeScreen
+        turn={retakeTurn}
+        retake={state.retake}
+        complete={complete}
+        onTryAgain={() => controller.startRetake(retakeTurn.id)}
+        onNext={controller.goNext}
+      />
+    );
+  } else {
+    content = exam;
+  }
+
+  const showErrorCard = Boolean(state.error) && state.screen !== SCREENS.CALL && state.screen !== SCREENS.RECAP;
 
   return (
-    <div className="app-shell">
-      <ExamHeader
-        audioEnabled={state.audioEnabled}
-        busy={state.busy}
-        canExportRecord={capabilities.canExportRecord}
-        canScoreNow={capabilities.canScoreNow}
-        changePracticeType={controller.changePracticeType}
-        changeTrainingMode={controller.changeTrainingMode}
-        changeFeedbackAdaptation={controller.changeFeedbackAdaptation}
-        feedbackAdaptation={state.feedbackAdaptation}
-        createFreshSession={controller.createFreshSession}
-        currentPhase={currentPhase}
-        downloadPracticeRecord={controller.downloadPracticeRecord}
-        isPracticeMode={sessionView.isPracticeMode}
-        practiceType={state.practiceType}
-        practiceTypes={PRACTICE_TYPES}
-        recording={recording}
-        requestReport={controller.requestReport}
-        session={state.session}
-        sessionStats={sessionView.sessionStats}
-        stageProgress={sessionView.stageProgress}
-        toggleAudioEnabled={controller.toggleAudioEnabled}
-        trainingMode={state.trainingMode}
-        trainingModes={TRAINING_MODES}
-        openRuntimeDiagnostics={() => setDiagnosticsOpen(true)}
-        replayGuide={() => setGuideReplayRequest((request) => request + 1)}
-      />
-      {diagnosticsOpen ? (
-        <RuntimeDiagnosticsPanel onClose={() => setDiagnosticsOpen(false)} />
-      ) : null}
-      {!diagnosticsOpen && sessionView.shouldShowStageCard ? (
-        <ExamStageCard
-          busy={state.busy}
-          changeCueCardTitle={controller.changeCueCardTitle}
-          changePart1Topic={controller.changePart1Topic}
-          formatDuration={formatDuration}
-          hasStageControls={sessionView.hasVisibleStageControls}
-          practiceOptions={state.practiceOptions}
-          prepRemaining={sessionView.prepRemaining}
-          recording={recording}
-          selectedCueCardTitle={state.selectedCueCardTitle}
-          selectedPart1Topic={state.selectedPart1Topic}
-          showCueCardSelect={sessionView.showCueCardSelect}
-          showPart1TopicSelect={sessionView.showPart1TopicSelect}
-          stageProgress={sessionView.stageProgress}
+    <div className={`app${desktop ? " is-desktop" : ""}`}>
+      {content}
+
+      {inExam ? (
+        <VoiceBanner
+          message={state.voiceIssue}
+          onRetry={() => {
+            dispatch(patch({ voiceIssue: "" }));
+            controller.replayQuestion();
+          }}
+          onDismiss={() => dispatch(patch({ voiceIssue: "" }))}
         />
       ) : null}
 
-      {!diagnosticsOpen ? (
-        <ChatPanel
-        bottomRef={bottomRef}
-        busy={state.busy}
-        busyLabel={busyLabel}
-        canRetryRecording={canRetryRecording}
-        chatPanelRef={chatPanelRef}
-        configWarning={sessionView.configWarning}
-        downloadPracticeRecord={controller.downloadPracticeRecord}
-        downloadReport={controller.downloadReport}
-        downloadTranscript={controller.downloadTranscript}
-        error={state.error}
-        feedbackPlayback={sessionView.isPracticeMode ? { ...speechState, onPlay: playFeedback, disabled: Boolean(state.busy || recording) } : null}
-        focusedPart={state.practiceType !== "full"}
-        messages={messages}
-        mockExam={sessionView.mockExam}
-        pendingSpeechUrl={pendingSpeechUrl}
-        playPendingSpeech={playPendingSpeech}
-        replayCurrentQuestion={replayCurrentQuestion}
-        report={state.report}
-        retryLastRecording={retryLastRecording}
-        shortScrollSlackRef={shortScrollSlackRef}
+      {showErrorCard ? (
+        <ErrorCard
+          error={state.error}
+          isWeChat={environment.isWeChat}
+          playbackUrl={recorder.lastRecordingUrl}
+          canRetryAudio={recorder.canRetry}
+          hasPending={Boolean(state.pendingAnswer)}
+          onRecordAgain={() => void startMic()}
+          onType={() => {
+            clearError();
+            openSheet("type");
+          }}
+          onRetryAudio={() => {
+            clearError();
+            void recorder.retryLast();
+          }}
+          onRetryPending={controller.retryPending}
+          onDiscard={() => {
+            controller.discardPending();
+            recorder.resetRecording();
+          }}
+          onDismiss={clearError}
         />
       ) : null}
 
-      {!diagnosticsOpen ? (
-        <MobileToasts
-        busy={state.busy}
-        busyLabel={busyLabel}
-        canRetryRecording={canRetryRecording}
-        error={state.error}
-        pendingSpeechUrl={pendingSpeechUrl}
-        playPendingSpeech={playPendingSpeech}
-        retryLastRecording={retryLastRecording}
+      {state.sheet === "type" ? (
+        <TypeSheet question={retakeTurn && !state.retake?.text ? retakeTurn.question : displayQuestion(state.session)} onSend={sendTyped} onClose={closeSheet} />
+      ) : null}
+      {state.sheet === "settings" ? (
+        <SettingsSheet
+          state={state}
+          captionsOn={captionsOn}
+          inSession={Boolean(state.session)}
+          onChange={(values) => dispatch(patch(values))}
+          onClose={closeSheet}
+          onEnd={() => {
+            closeSheet();
+            goHome();
+          }}
+          onDownload={controller.downloadTranscript}
         />
       ) : null}
-
-      {!diagnosticsOpen ? (
-        <AnswerComposer
-        busy={state.busy}
-        beginRetake={beginRetake}
-        cancelRecording={cancelRecording}
-        canAnswer={capabilities.canAnswer}
-        discardReviewedDraft={discardReviewedDraft}
-        draft={state.draft}
-        elapsed={elapsed}
-        formatDuration={formatDuration}
-        handleTextComposerKeyDown={controller.handleTextComposerKeyDown}
-        mode={state.mode}
-        keepPreviousDraft={keepPreviousDraft}
-        onDraftChange={controller.setDraft}
-        onModeToggle={controller.toggleInputMode}
-        onReviewBeforeSendChange={controller.setReviewBeforeSend}
-        recordButtonDisabled={recordButtonDisabled}
-        recordButtonText={recordButtonText}
-        recording={recording}
-        replacementDraft={replacementDraft}
-        requestReport={controller.requestReport}
-        reviewBeforeSend={state.reviewBeforeSend}
-        reviewedRecording={reviewedRecording}
-        session={state.session}
-        submitTypedAnswer={controller.submitTypedAnswer}
-        toggleRecording={handleToggleRecording}
-        useReplacementDraft={useReplacementDraft}
-        />
-      ) : null}
-      <GuidedTour
-        ready={Boolean(state.session && !state.busy && !diagnosticsOpen)}
-        replayRequest={guideReplayRequest}
-        trainingMode={state.trainingMode}
-        practiceType={state.practiceType}
-        trainingModes={TRAINING_MODES}
-        practiceTypes={PRACTICE_TYPES}
-        selectionKind={getTourSelectionKind(sessionView)}
-        chooseTrainingMode={(value) => controller.changeTrainingMode({ target: { value } })}
-        choosePracticeType={(value) => controller.changePracticeType({ target: { value } })}
-      />
     </div>
   );
 }

@@ -31,6 +31,8 @@ SAFE_ACTIONS = {
 class Part1Feedback:
     feedback: tuple[str | None, str | None, str | None, bool]
     observation: tuple[str, str] | None = None
+    # V4: answer kind exposed to the structured feedback payload (UI only).
+    kind: str | None = None
 
 
 def has_explicit_transcript_gap(answer: str, source: str) -> bool:
@@ -396,4 +398,4 @@ INPUT_SOURCE: {source}
             and support in REASONS and REASONS[support] == reason
             and evidence and evidence in answer and len(evidence) >= 3 and len(answer) <= MAX_ANSWER_CHARS):
         observation = (support, reason)
-    return Part1Feedback((correction, tip, rewrite, True), observation)
+    return Part1Feedback((correction, tip, rewrite, True), observation, kind)

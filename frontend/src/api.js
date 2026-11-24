@@ -1,7 +1,7 @@
 const API_BASE = import.meta.env?.VITE_API_BASE || "";
 const DEFAULT_TIMEOUT_MS = 30000;
 export const TTS_TIMEOUT_MS = 12000;
-const TTS_TIMEOUT_MESSAGE = "Voice is temporarily unavailable. Continue with the text shown above.";
+const TTS_TIMEOUT_MESSAGE = "Victoria can't speak right now. The question is shown as text.";
 
 function telemetryUrl() {
   return `${API_BASE}/api/telemetry`;

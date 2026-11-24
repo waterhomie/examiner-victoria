@@ -101,7 +101,7 @@ export function buildPracticeRecordText(session, report) {
     buildTranscriptText(session).trim(),
     "",
     "## Report",
-    report?.trim() || "No score report generated yet. Tap Score when you want Victoria to create one.",
+    report?.trim() || "No recap yet. Finish the session to get one.",
   );
 
   return `${lines.join("\n").replace(/\n{4,}/g, "\n\n\n").trim()}\n`;
