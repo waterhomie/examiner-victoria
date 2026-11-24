@@ -14,7 +14,7 @@ import { patch, restored, setError } from "./state/actions.js";
 import { appReducer } from "./state/appReducer.js";
 import { initialState, SCREENS } from "./state/initialState.js";
 import { ErrorCard, VoiceBanner } from "./components/ErrorCard.jsx";
-import { SettingsSheet, TypeSheet } from "./components/Sheets.jsx";
+import { EndSheet, SettingsSheet, TypeSheet } from "./components/Sheets.jsx";
 import { CallScreen } from "./components/screens/CallScreen.jsx";
 import { ExamScreen } from "./components/screens/ExamScreen.jsx";
 import { HomeScreen } from "./components/screens/HomeScreen.jsx";
@@ -26,6 +26,7 @@ import { loadMemo } from "./utils/memo.js";
 import { getPageEnvironment } from "./utils/runtimeDiagnostics.js";
 import { clearSavedSession, loadSavedSession, saveSessionSnapshot } from "./utils/sessionStorage.js";
 import { displayQuestion, isSessionComplete } from "./utils/sessionView.js";
+import { endSessionPlan } from "./utils/endSession.js";
 
 const SESSION_SCREENS = new Set([SCREENS.EXAM, SCREENS.MARKING, SCREENS.REVIEW, SCREENS.RETAKE]);
 
@@ -157,11 +158,19 @@ export default function App() {
   const activeIndex = activeTurn ? state.turns.indexOf(activeTurn) + 1 : 0;
   const retakeTurn = state.retake ? state.turns.find((turn) => turn.id === state.retake.turnId) : null;
   const complete = isSessionComplete(state.session);
+  const endPlan = endSessionPlan(state.trainingMode, state.session);
 
   const goHome = useCallback(() => {
-    controller.endSession();
+    controller.resetSession();
     clearSavedSession(STORAGE_KEY);
     setResume(null);
+  }, [controller]);
+
+  const confirmEnd = useCallback(() => {
+    if (controller.endSession() === "home") {
+      clearSavedSession(STORAGE_KEY);
+      setResume(null);
+    }
   }, [controller]);
 
   const exam = (
@@ -214,7 +223,7 @@ export default function App() {
     else if (state.retake?.text && retakeTurn) {
       right = <RetakeScreen turn={retakeTurn} retake={state.retake} complete={complete} embedded onTryAgain={() => controller.startRetake(retakeTurn.id)} onNext={controller.goNext} />;
     } else if (activeTurn?.feedback?.coaching) {
-      right = <ReviewScreen turn={activeTurn} index={activeIndex} complete={complete} embedded onRetake={() => controller.startRetake(activeTurn.id)} onListen={controller.listen} />;
+      right = <ReviewScreen turn={activeTurn} index={activeIndex} complete={complete} embedded onRetake={() => controller.startRetake(activeTurn.id)} onListen={controller.listen} onEnd={() => openSheet("end")} busy={state.busy} />;
     } else {
       right = (
         <main className="screen paper desk-empty">
@@ -235,6 +244,8 @@ export default function App() {
         onRetake={() => controller.startRetake(activeTurn.id)}
         onNext={controller.goNext}
         onListen={controller.listen}
+        onEnd={() => openSheet("end")}
+        busy={state.busy}
       />
     );
   } else if (state.screen === SCREENS.RETAKE) {
@@ -303,11 +314,17 @@ export default function App() {
           inSession={Boolean(state.session)}
           onChange={(values) => dispatch(patch(values))}
           onClose={closeSheet}
-          onEnd={() => {
-            closeSheet();
-            goHome();
-          }}
+          onEnd={() => openSheet("end")}
           onDownload={controller.downloadTranscript}
+        />
+      ) : null}
+      {state.sheet === "end" ? (
+        <EndSheet
+          trainingMode={state.trainingMode}
+          answerCount={endPlan.answerCount}
+          totalQuestions={endPlan.totalQuestions}
+          onConfirm={confirmEnd}
+          onClose={closeSheet}
         />
       ) : null}
     </div>

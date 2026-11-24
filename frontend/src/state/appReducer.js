@@ -146,7 +146,7 @@ export function appReducer(state = initialState, action) {
       return { ...state, busy: "", report: action.report, reportStatus: "ready" };
 
     case ACTIONS.REPORT_FAILED:
-      return { ...state, busy: "", reportStatus: "failed", error: action.error };
+      return { ...state, busy: "", reportStatus: "failed", error: action.error, screen: action.returnScreen || state.screen };
 
     case ACTIONS.ERROR:
       return { ...state, error: action.error };

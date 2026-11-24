@@ -24,7 +24,7 @@ export const initialState = {
   // Settings
   audioEnabled: true,
   captions: null, // null = default for the mode (Practice on, Mock off)
-  sheet: "", // "" | "settings" | "type" | "system"
+  sheet: "", // "" | "settings" | "type" | "end"
 
   // Backend data
   health: null,
