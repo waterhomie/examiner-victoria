@@ -55,6 +55,12 @@ This is a separate, facilitator-present first-use session. The participant first
 
 The local preview did not play audio in this session (11:28–11:52). Its TTS was not configured, so this does **not** establish a production playback defect. The next test should record whether the user can select a mode and Part, choose a topic, answer one question, find Restart, and understand replay **without facilitator instruction**. Record the build, device, browser, and whether audio was enabled.
 
+### 2026-11-06 | Independent follow-up feedback (Quark browser)
+
+The participant used Quark browser on a phone. The facilitator invited her to raise any questions or confusion during use; she raised none about the controls or answering flow. Answering with text worked without difficulty. She reached Practice feedback and understood that Quick correction and Natural version could be tapped to play. The product owner subsequently confirmed that the first-action, help-seeking, recovery-after-error, and two-feedback-comprehension checks are sufficiently covered for this recap; do not list them as outstanding tasks. This is a positive usability observation, not a saved step-by-step interaction log or a before/after comparison. Her phone model, OS version, network, and microphone permission state were not recorded. Screenshots separately show a voice-playback failure and an audio-transcription connection failure; she used text when speech recognition failed. Network conditions or microphone permission are possible explanations raised by the product owner, **not confirmed causes**. Do not attribute either failure to Quark or the operating system without reproduction.
+
+**New report-presentation suggestion:** After each practice round, she would like the downloadable report to be available as an image or a more visual PDF, making it easier to read, save, or share. This is a participant proposal, not an implemented feature or a confirmed format preference. It is distinct from F-009 (report content and traceability) and F-012 (finding past records). Before changing the product, inspect the current report export and ask which task matters most—reading on the phone, saving, or sharing—and whether an image, PDF, or improved in-browser report serves it best. Preserve the existing report content and accessible text in any visual treatment. **Status: recorded for validation; no code change on 2026-11-06.**
+
 ## 3. Feedback Table
 
 | ID | Tester | User feedback | Product issue | Current capability | Product decision | Priority | Status |
