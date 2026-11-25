@@ -86,6 +86,55 @@ class AnswerFeedbackTests(unittest.TestCase):
         self.assertTrue(feedback.correction.quote_in_answer)
         self.assertIsNone(feedback.pace)
 
+    def test_part2_long_upgrade_produces_word_edits(self):
+        answer = (
+            "I am work in a small shop near my house. I meet many people there. "
+            "The shop is busy in the morning, and I enjoy talking with customers. "
+            "I started this job last year because it is close to my family. "
+            "On weekends I clean the shelves and help people find what they need."
+        )
+        upgraded = (
+            "I work at a small shop near my house. It gets busy in the morning, "
+            "but I enjoy speaking with customers. I started last year because "
+            "it is close to my family. At weekends I tidy the shelves and help "
+            "people find what they need."
+        )
+        reply = (
+            'CORRECTION: Say "I work" instead of "I am work".\n'
+            'EXPRESSION_TIP: NONE\n'
+            f'UPGRADED_ANSWER: {upgraded}'
+        )
+        with patch("backend.feedback_service.call_model", return_value=reply) as model:
+            result = process_answer_detailed(start_session(practice_type="part2"), answer, source="audio", duration=65)
+        self.assertIn("ENABLE_UPGRADE: YES", model.call_args.args[0][1]["content"])
+        self.assertEqual(result.answered_phase, "part2_long")
+        self.assertEqual(result.feedback.natural_version, upgraded)
+        self.assertTrue(any(edit.op in {"delete", "insert", "replace"} for edit in result.feedback.edits))
+        self.assertIsNone(result.feedback.kind)  # General Part 2 coaching has no answer-kind verdict.
+        self.assertEqual(result.session.phase, "part2_followup")  # Existing long-turn transition is unchanged.
+
+    def test_part2_long_sentence_correction_fallback(self):
+        answer = "I am work in a small shop near my house. I meet many people there."
+        correction = 'Replace "I am work in a small shop near my house" with "I work in a small shop near my house".'
+        reply = f"CORRECTION: {correction}\nEXPRESSION_TIP: NONE\nUPGRADED_ANSWER: NONE"
+        with patch("backend.feedback_service.call_model", return_value=reply):
+            result = process_answer_detailed(start_session(practice_type="part2"), answer)
+        self.assertIsNone(result.feedback.natural_version)
+        self.assertEqual(result.feedback.edits, [])
+        self.assertEqual(result.feedback.correction.quote, "I am work in a small shop near my house")
+        self.assertEqual(result.feedback.correction.replacement, "I work in a small shop near my house")
+        self.assertTrue(result.feedback.correction.quote_in_answer)
+
+        unparsed = build_answer_feedback(
+            answer=answer, phase="part2_long", source="text", duration=None,
+            words_per_minute=None, word_count=15, practice_mode=True,
+            correction="Make the first sentence more natural.", tip=None, natural_version=None,
+            feedback_available=True,
+        )
+        self.assertEqual(unparsed.correction.sentence, "Make the first sentence more natural.")
+        self.assertIsNone(unparsed.correction.quote)
+        self.assertEqual(unparsed.edits, [])
+
     def test_process_answer_wrapper_and_detailed(self):
         reply = "CORRECTION: NONE\nEXPRESSION_TIP: NONE\nUPGRADED_ANSWER: NONE"
         with patch("backend.feedback_service.call_model", return_value=reply):
