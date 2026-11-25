@@ -31,7 +31,7 @@ import { endSessionPlan } from "./src/utils/endSession.js";
 import { compareRetake, hasMarks, retakeHeadline, topFix, transcriptSegments, verdictChips } from "./src/utils/feedbackView.js";
 import { parseReport } from "./src/utils/reportView.js";
 import { analyzeUserAgent, buildDiagnosticCopyText } from "./src/utils/runtimeDiagnostics.js";
-import { displayQuestion, parseCueCard, progressFor, speakableText, stripMarkdown } from "./src/utils/sessionView.js";
+import { displayQuestion, parseCueCard, progressFor, progressReviewDisabled, reviewableTurnsForProgress, speakableText, stripMarkdown } from "./src/utils/sessionView.js";
 
 function setNavigator(value) {
   Object.defineProperty(globalThis, "navigator", { value, configurable: true });
@@ -101,6 +101,14 @@ function assertSessionView() {
   const longTurn = session({ phase: "part2_long", current_question: "**Part 2 - Long Turn**\n\nDescribe a building.", cue_card: { prompt: "Describe a building.\n\nYou should say:\n- what it is" } });
   assert.equal(displayQuestion(longTurn), "Describe a building.");
   assert.match(displayQuestion({ ...longTurn, current_question: "Please continue - you still have time." }), /^Please continue/);
+}
+
+function assertProgressReview() {
+  const savedTurn = { id: "q1", phase: "part1", answer: "I like music.", feedback: { coaching: true } };
+  const currentSession = session({ part1_index: 2 });
+  assert.equal(reviewableTurnsForProgress({ session: currentSession, turns: [savedTurn], trainingMode: "practice" })[1], savedTurn);
+  assert.deepEqual(reviewableTurnsForProgress({ session: currentSession, turns: [savedTurn], trainingMode: "mock" }), {});
+  assert.equal(progressReviewDisabled({ recording: true, transcribing: false, busy: "", retake: null }), true);
 }
 
 function assertFeedbackView() {
@@ -279,6 +287,7 @@ function assertBrowserGuards() {
 await assertApiErrorMapping();
 assertProductMetadata();
 assertSessionView();
+assertProgressReview();
 assertFeedbackView();
 assertReportParsing();
 assertReducerFlow();

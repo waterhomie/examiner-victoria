@@ -44,14 +44,17 @@ export function Monogram({ size = "md", speaking = false }) {
   );
 }
 
-export function ProgressDots({ total, current, tone = "ink" }) {
+export function ProgressDots({ total, current, tone = "ink", onSelectTurn, disabled = false, clickable = {} }) {
   if (!total) return null;
+  const hasReview = Object.keys(clickable).length > 0;
   return (
-    <div className={`dots dots-${tone}`} role="img" aria-label={`Question ${current} of ${total}`}>
+    <div className={`dots dots-${tone}`} role={hasReview ? "group" : "img"} aria-label={`Question ${current} of ${total}`}>
       {Array.from({ length: total }, (_, index) => {
         const position = index + 1;
         const cls = position < current ? "on" : position === current ? "now" : "";
-        return <i key={position} className={cls} />;
+        return position < current && clickable[position] ? (
+          <button key={position} className={cls} type="button" aria-label={`Review question ${position}`} disabled={disabled} onClick={() => onSelectTurn?.(position)} />
+        ) : <i key={position} className={cls} aria-hidden="true" />;
       })}
     </div>
   );

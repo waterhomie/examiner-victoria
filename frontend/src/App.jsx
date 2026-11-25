@@ -21,11 +21,11 @@ import { HomeScreen } from "./components/screens/HomeScreen.jsx";
 import { MarkingScreen } from "./components/screens/MarkingScreen.jsx";
 import { RecapScreen } from "./components/screens/RecapScreen.jsx";
 import { RetakeScreen } from "./components/screens/RetakeScreen.jsx";
-import { ReviewScreen } from "./components/screens/ReviewScreen.jsx";
+import { ReadOnlyReviewSheet, ReviewScreen } from "./components/screens/ReviewScreen.jsx";
 import { loadMemo } from "./utils/memo.js";
 import { getPageEnvironment } from "./utils/runtimeDiagnostics.js";
 import { clearSavedSession, loadSavedSession, saveSessionSnapshot } from "./utils/sessionStorage.js";
-import { displayQuestion, isSessionComplete } from "./utils/sessionView.js";
+import { displayQuestion, isSessionComplete, progressReviewDisabled, reviewableTurnsForProgress } from "./utils/sessionView.js";
 import { endSessionPlan } from "./utils/endSession.js";
 
 const SESSION_SCREENS = new Set([SCREENS.EXAM, SCREENS.MARKING, SCREENS.REVIEW, SCREENS.RETAKE]);
@@ -33,6 +33,7 @@ const SESSION_SCREENS = new Set([SCREENS.EXAM, SCREENS.MARKING, SCREENS.REVIEW, 
 export default function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const [memo, setMemo] = useState(() => loadMemo(MEMO_KEY));
+  const [reviewSelection, setReviewSelection] = useState(null);
   const [resume, setResume] = useState(() => {
     const saved = loadSavedSession(STORAGE_KEY);
     return saved?.session && !isSessionComplete(saved.session) ? saved : null;
@@ -81,6 +82,10 @@ export default function App() {
   useEffect(() => {
     if (state.screen === SCREENS.HOME) setMemo(loadMemo(MEMO_KEY));
   }, [state.screen]);
+
+  useEffect(() => {
+    setReviewSelection(null);
+  }, [state.screen, state.session?.phase, state.session?.session_id]);
 
   // Load health + practice options once.
   useEffect(() => {
@@ -142,7 +147,7 @@ export default function App() {
 
   const inExam = SESSION_SCREENS.has(state.screen) && Boolean(state.session);
   useHoldToTalk({
-    enabled: desktop && inExam && !state.sheet && !state.error && state.busy !== "sending",
+    enabled: desktop && inExam && !state.sheet && !state.error && !reviewSelection && state.busy !== "sending",
     onPress: () => {
       if (!recorder.recording && !recorder.transcribing) {
         if (state.session?.phase === "part2_long") dispatch(patch({ part2Started: true, prepEndsAt: null }));
@@ -159,6 +164,9 @@ export default function App() {
   const retakeTurn = state.retake ? state.turns.find((turn) => turn.id === state.retake.turnId) : null;
   const complete = isSessionComplete(state.session);
   const endPlan = endSessionPlan(state.trainingMode, state.session);
+  const reviewableTurns = reviewableTurnsForProgress({ session: state.session, turns: state.turns, trainingMode: state.trainingMode });
+  const reviewDisabled = progressReviewDisabled({ recording: recorder.recording, transcribing: recorder.transcribing, busy: state.busy, retake: state.retake, marking: state.marking });
+  const reviewedTurn = state.turns.find((turn) => turn.id === reviewSelection?.turnId) || null;
 
   const goHome = useCallback(() => {
     controller.resetSession();
@@ -186,6 +194,12 @@ export default function App() {
       onOpenSettings={() => openSheet("settings")}
       onStartPart2={startPart2}
       onCancelRetake={controller.cancelRetake}
+      reviewableTurns={reviewableTurns}
+      reviewDisabled={reviewDisabled}
+      onSelectTurn={(position) => {
+        const turn = reviewableTurns[position];
+        if (!reviewDisabled && turn) setReviewSelection({ turnId: turn.id, position });
+      }}
     />
   );
 
@@ -267,6 +281,10 @@ export default function App() {
   return (
     <div className={`app${desktop ? " is-desktop" : ""}`}>
       {content}
+
+      {state.screen === SCREENS.EXAM && reviewedTurn ? (
+        <ReadOnlyReviewSheet turn={reviewedTurn} index={reviewSelection.position} onClose={() => setReviewSelection(null)} />
+      ) : null}
 
       {inExam ? (
         <VoiceBanner

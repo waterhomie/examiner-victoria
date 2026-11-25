@@ -1,9 +1,10 @@
+import { useEffect } from "react";
 import { hasMarks, topFix, verdictChips } from "../../utils/feedbackView.js";
 import { MarkLegend, TranscriptSheet } from "../TranscriptSheet.jsx";
 import { Chip, Icon } from "../ui.jsx";
 
 function ListenButton({ text, onListen, label }) {
-  if (!text) return null;
+  if (!text || !onListen) return null;
   return (
     <button className="spk" type="button" onClick={() => onListen(text)} aria-label={label}>
       <Icon name="speaker" size={16} />
@@ -32,15 +33,19 @@ export function FixCard({ fix, onListen }) {
   );
 }
 
-export function ReviewBody({ turn, onListen }) {
+export function ReviewBody({ turn, onListen, showQuestion = true }) {
   const feedback = turn.feedback;
   const chips = verdictChips(feedback);
   const fix = topFix(feedback);
   const extraTip = fix?.label === "Top fix" && feedback?.tip ? feedback.tip : "";
   return (
     <>
-      <p className="kicker">QUESTION</p>
-      <h2 className="serif review-question">{turn.question}</h2>
+      {showQuestion ? (
+        <>
+          <p className="kicker">QUESTION</p>
+          <h2 className="serif review-question">{turn.question}</h2>
+        </>
+      ) : null}
 
       {chips.length ? (
         <div className="chip-row verdicts">
@@ -80,6 +85,35 @@ export function ReviewBody({ turn, onListen }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+export function ReadOnlyReviewSheet({ turn, index, onClose }) {
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!turn) return null;
+  return (
+    <div className="overlay" onClick={onClose} role="presentation">
+      <section className="bottom-sheet history-review" role="dialog" aria-modal="true" aria-label={`Review question ${index}`} onClick={(event) => event.stopPropagation()} data-testid="history-review">
+        <header className="sheet-bar history-review-head">
+          <div>
+            <span className="pill">Review · Q{index}</span>
+            <h2 className="serif review-question">{turn.question}</h2>
+          </div>
+          <button className="icon-btn" type="button" onClick={onClose} aria-label="Close review" data-testid="close-review">
+            <Icon name="close" />
+          </button>
+        </header>
+        <div className="paper-scroll history-review-scroll">
+          <ReviewBody turn={turn} showQuestion={false} />
+        </div>
+      </section>
+    </div>
   );
 }
 
