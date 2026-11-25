@@ -88,6 +88,39 @@ export function progressFor(session) {
   return { label: "Done", total: 1, current: 1 };
 }
 
+// Map completed dots in the current part to saved coaching turns. Nothing in
+// this view helper changes the session or requests feedback.
+export function progressReviewDisabled({ recording, transcribing, busy, retake, marking }) {
+  return Boolean(recording || transcribing || busy === "sending" || busy === "marking" || retake || marking);
+}
+
+export function reviewableTurnsForProgress({ session, turns = [], trainingMode }) {
+  if (!session || trainingMode !== "practice") return {};
+  const { current } = progressFor(session);
+  const phase = session.phase;
+  const reviewable = {};
+  if (phase === "part1") {
+    turns.filter((turn) => turn.phase === "part1" && turn.feedback?.coaching).forEach((turn, index) => {
+      if (index + 1 < current) reviewable[index + 1] = turn;
+    });
+  } else if (phase === "part2_followup" && current > 1) {
+    const longTurn = turns.filter((turn) => turn.phase === "part2_long" && turn.feedback?.coaching).at(-1);
+    if (longTurn) reviewable[1] = longTurn;
+  } else if (phase === "part3") {
+    const part3Turns = turns.filter((turn) => turn.phase === "part3" && turn.feedback?.coaching);
+    const history = session.part3_history || [];
+    let cursor = 0;
+    history.forEach((item, index) => {
+      const match = part3Turns.findIndex((turn, turnIndex) => turnIndex >= cursor && turn.answer === item.answer);
+      if (match >= 0) {
+        if (index + 1 < current) reviewable[index + 1] = part3Turns[match];
+        cursor = match + 1;
+      }
+    });
+  }
+  return reviewable;
+}
+
 export function countWords(text) {
   return (String(text || "").match(/[A-Za-z']+/g) || []).length;
 }

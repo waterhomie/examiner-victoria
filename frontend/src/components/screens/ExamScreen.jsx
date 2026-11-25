@@ -51,6 +51,9 @@ export function ExamScreen({
   onOpenSettings,
   onStartPart2,
   onCancelRetake,
+  reviewableTurns = {},
+  reviewDisabled = false,
+  onSelectTurn,
 }) {
   const { session, trainingMode, retake, busy, prepEndsAt, part2Started, clockTick } = state;
   const progress = progressFor(session);
@@ -81,7 +84,7 @@ export function ExamScreen({
     <main className={`screen ink exam${desktop ? " is-desktop" : ""}`} data-testid="exam-screen">
       <header className="bar">
         <span className="pill">{pill}</span>
-        {retake ? <span /> : <ProgressDots total={progress.total} current={progress.current} />}
+        {retake ? <span /> : <ProgressDots total={progress.total} current={progress.current} clickable={reviewableTurns} disabled={reviewDisabled} onSelectTurn={onSelectTurn} />}
         <button className="icon-btn" type="button" onClick={onOpenSettings} aria-label="Settings">
           <Icon name="settings" />
         </button>
