@@ -99,10 +99,25 @@ def pace_label(words_per_minute: float | None) -> str | None:
     return "good"
 
 
-def build_correction(correction: str | None, answer: str) -> AnswerCorrection | None:
+def part2_sentence_anchors(correction: str, answer: str) -> tuple[str, str] | None:
+    """Accept a quoted sentence pair only when its original occurs in the transcript."""
+    patterns = (
+        r'Replace\s+["“]([^"”]+)["”]\s+with\s+["“]([^"”]+)["”]\.?',
+        r'["“]([^"”]+)["”]\s*(?:→|->)\s*["“]([^"”]+)["”]\.?',
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, correction.strip(), re.I)
+        if match and re.search(rf"(?<!\w){re.escape(match.group(1))}(?!\w)", answer, re.I):
+            return match.group(1), match.group(2)
+    return None
+
+
+def build_correction(correction: str | None, answer: str, phase: str) -> AnswerCorrection | None:
     if not correction:
         return None
     anchors = correction_text_anchors(correction)
+    if not anchors and phase == "part2_long":
+        anchors = part2_sentence_anchors(correction, answer)
     if not anchors:
         return AnswerCorrection(sentence=correction)
     quote, replacement = anchors
@@ -142,7 +157,7 @@ def build_answer_feedback(
         coaching=coaching,
         available=feedback_available if coaching else False,
         kind=kind if coaching else None,
-        correction=build_correction(correction, answer) if coaching else None,
+        correction=build_correction(correction, answer, phase) if coaching else None,
         tip=tip if coaching else None,
         natural_version=natural_version if coaching else None,
         edits=build_edits(answer, natural_version) if coaching else [],

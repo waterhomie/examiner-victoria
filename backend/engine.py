@@ -99,7 +99,7 @@ def process_answer_detailed(
     include_upgrade = (
         session.practice_mode
         and session.answer_expansion_mode
-        and phase in {"part1", "part2_followup", "part3"}
+        and phase in {"part1", "part2_long", "part2_followup", "part3"}
     )
     focused_part1 = is_focused_part1(session)
     if focused_part1:
